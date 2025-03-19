@@ -1,0 +1,6 @@
+@FlyGiftBackend_HostAddress = http://localhost:5069
+
+GET {{FlyGiftBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
