@@ -1,12 +1,1 @@
-{
-  "Version": 1,
-  "Hash": "66rBVGfmB8iqT/gOApEk0A57l+y5QDFXGNlc5ag8RTU=",
-  "Source": "FlyGiftBackend",
-  "BasePath": "_content/FlyGiftBackend",
-  "Mode": "Default",
-  "ManifestType": "Build",
-  "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": [],
-  "Endpoints": []
-}
+{"Version":1,"Hash":"GmYM0nee2iioIk2S36F6vk58kC6DRiIwfEGLapqbV28=","Source":"FlyGiftBackend","BasePath":"/","Mode":"Root","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}

@@ -15,12 +15,5 @@ namespace FlyGiftBackend.Models
         public BookingStatus Status { get; set; }
 
         public DateTime CreatedAt { get; set; }
-
-        public enum BookingStatus
-        {
-            Booked,
-            Pending,
-            Cancelled
-        }
     }
 }

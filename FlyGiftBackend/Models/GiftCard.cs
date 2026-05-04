@@ -26,6 +26,8 @@ namespace FlyGiftBackend.Models
 
         public GiftCardStatus Status { get; set; }
 
+        // Optimistic concurrency via Postgres `xmin` (see AppDbContext).
+
         public DateTime CreatedAt { get; set; }
     }
 

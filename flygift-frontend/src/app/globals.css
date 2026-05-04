@@ -1,58 +1,276 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========== Cinematic Skyline tokens (dark = primary) ========== */
+:root {
+  --bg-base: #050814;
+  --bg-elevated: #0b1228;
+  --bg-glass: rgba(20, 28, 56, 0.55);
+  --border-glass: rgba(255, 255, 255, 0.08);
+
+  --accent-primary: #00e5ff;
+  --accent-gold: #d4af7a;
+  --accent-violet: #7c5cff;
+
+  --text-primary: #f4f7ff;
+  --text-secondary: #8b96b8;
+
+  color-scheme: dark;
+}
+
+.light {
+  --bg-base: #eaf6ff;
+  --bg-elevated: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.4);
+  --border-glass: rgba(15, 23, 42, 0.10);
+
+  --accent-primary: #0066ff;
+  --accent-gold: #b7894c;
+  --accent-violet: #5b3dd9;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+
+  color-scheme: light;
+}
+
+/* ========== Theme transitions ==========
+   Smooth sunset/sunrise feel (0.8s ease-in-out) for atmospheric tokens.
+   We DON'T transition layout properties to avoid jank. */
+html,
+body {
+  transition: background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== Reset ========== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* iOS Safari auto-zooms when focusing form controls < 16px. Force a
+   minimum 16px on touch input devices to keep our compact UI from
+   triggering zoom (which then traps users with no gesture to undo). */
+@media (hover: none) and (pointer: coarse) {
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-
-/* :root {
-  --background: #ffffff;
-  --foreground: #171717;
-} */
-
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-} */
-
-
-
-/* html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-} */
-
-/* body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-} */
+  text-rendering: optimizeLegibility;
+}
 
-/* * {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-} */
+html[dir="rtl"] body,
+:lang(he) body {
+  font-family: var(--font-heebo), var(--font-sans), ui-sans-serif, system-ui;
+}
 
-/* a {
-  color: inherit;
-  text-decoration: none;
-} */
-
-/* @media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+/* ========== Glassmorphism utilities ========== */
+@layer utilities {
+  .glass {
+    background-color: var(--bg-glass);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--border-glass);
   }
-} */
+
+  .glass-strong {
+    background-color: var(--bg-glass);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid var(--border-glass);
+  }
+
+  .text-gradient-skyline {
+    background: linear-gradient(135deg, #0066ff 0%, #00e5ff 45%, #7c5cff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  html.light .text-gradient-skyline {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #0066FF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .ring-focus:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent-primary);
+  }
+
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0.5rem);
+  }
+
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
+
+  .shimmer-overlay {
+    background: linear-gradient(110deg,
+        transparent 35%,
+        rgba(255, 255, 255, 0.18) 50%,
+        transparent 65%);
+    background-size: 200% 100%;
+    animation: shimmer 2.4s linear infinite;
+  }
+}
+
+/* ========== Scrollbar ========== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 150, 184, 0.25);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 150, 184, 0.4);
+}
+
+/* ========== Reduced motion ========== */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ========== Balance card ripple (dashboard) ========== */
+@keyframes balance-ripple {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.balance-ripple-ring {
+  animation: balance-ripple 2.6s ease-out infinite;
+  will-change: transform, opacity;
+}
+
+.balance-ripple-ring.delay-1 {
+  animation-delay: 0.9s;
+}
+
+.balance-ripple-ring.delay-2 {
+  animation-delay: 1.8s;
+}
+
+/* ========== Stage 21 — Day & Night Flight ========== */
+@layer utilities {
+
+  /* Brand "FlyGift" — deep navy in light, luminous white→cyan in dark. */
+  .brand-glow {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #0F172A 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    transition: text-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html.light .brand-glow {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  html.dark .brand-glow {
+    background: linear-gradient(135deg, #F4F7FF 0%, #BAE6FD 45%, #5BF0FF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 18px rgba(14, 165, 233, 0.45),
+      0 0 36px rgba(14, 165, 233, 0.2);
+  }
+
+  /* Primary CTA — Executive deep-navy in both modes; cyan halo only at night. */
+  .btn-gold {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #0F172A 100%);
+    color: #ffffff;
+    transition: box-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.2s ease-out;
+  }
+
+  html.light .btn-gold {
+    box-shadow: 0 10px 28px -10px rgba(15, 23, 42, 0.55);
+  }
+
+  html.dark .btn-gold {
+    box-shadow: 0 0 22px rgba(14, 165, 233, 0.4),
+      0 0 44px rgba(14, 165, 233, 0.18);
+  }
+
+  .btn-gold:hover {
+    transform: scale(1.03);
+  }
+
+  .btn-gold:active {
+    transform: scale(0.98);
+  }
+
+  /* Atmospheric sky layers (HeroAirplane backdrop). Cross-faded between themes. */
+  .sky-day {
+    background: linear-gradient(to bottom, #BAE6FD 0%, #E0F2FE 55%, #FFFFFF 100%);
+  }
+
+  .sky-night {
+    background: radial-gradient(ellipse 120% 80% at 50% 110%, rgba(0, 229, 255, 0.22) 0%, rgba(0, 102, 255, 0.12) 30%, rgba(2, 16, 36, 0) 65%),
+      linear-gradient(to bottom, #020617 0%, #0F172A 100%);
+  }
+
+  /* Twinkling stars (used by <StarField/>). Pure CSS, GPU-friendly. */
+  @keyframes star-twinkle {
+
+    0%,
+    100% {
+      opacity: var(--tw-base-opacity, 1);
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.15;
+      transform: scale(0.6);
+    }
+  }
+
+  .star-twinkle {
+    animation-name: star-twinkle;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+    will-change: opacity, transform;
+  }
+}

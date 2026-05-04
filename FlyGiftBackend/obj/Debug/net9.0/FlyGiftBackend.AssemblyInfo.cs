@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FlyGiftBackend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bfd3b1ca0ffaaaec990e2c1587c8218dbd394887")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e2c50cc87afd2d8b301fb0ea5429b6d22602a73f")]
 [assembly: System.Reflection.AssemblyProductAttribute("FlyGiftBackend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FlyGiftBackend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

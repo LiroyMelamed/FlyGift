@@ -1,6 +1,16 @@
 using FlyGiftBackend.Data;
 using FlyGiftBackend.Reposetories;
 using FlyGiftBackend.Repositories;
+using FlyGiftBackend.Services;
+using FlyGiftBackend.Services.Billing;
+using FlyGiftBackend.Services.Bulk;
+using FlyGiftBackend.Services.Wallet;
+using FlyGiftBackend.Services.Flights;
+using FlyGiftBackend.Services.Booking;
+using FlyGiftBackend.Services.Ledger;
+using FlyGiftBackend.Services.Messaging;
+using FlyGiftBackend.Services.Otp;
+using FlyGiftBackend.Services.Payments;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -22,11 +32,63 @@ if (string.IsNullOrEmpty(secretKey))
 var key = Encoding.UTF8.GetBytes(secretKey);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("FlyGiftDatabase")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("FlyGiftDatabase"),
+        npg => npg.EnableRetryOnFailure(maxRetryCount: 3)));
 
 //builder.Services.AddScoped<GroomingQueueRepository>();
 //builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<AuthRepository>();
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<GiftCardRepository>();
+builder.Services.AddScoped<TransactionRepository>();
+builder.Services.AddScoped<FlightBookingRepository>();
+builder.Services.AddScoped<HotelBookingRepository>();
+// Idempotency cache + nightly expiration sweep
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IIdempotencyService, IdempotencyService>();
+
+// Stage 16 — Immutable ledger / source-of-truth balance.
+builder.Services.AddScoped<IBalanceService, BalanceService>();
+
+// Stage 17 — Messaging (Email + SMS), templates, OTP, Invoices.
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("Messaging:SendGrid"));
+builder.Services.Configure<TwilioOptions>(builder.Configuration.GetSection("Messaging:Twilio"));
+builder.Services.Configure<OtpOptions>(builder.Configuration.GetSection("Otp"));
+builder.Services.AddSingleton<ITemplateEngine, SimpleTemplateEngine>();
+builder.Services.AddSingleton<ITemplateCatalog, InMemoryTemplateCatalog>();
+builder.Services.AddScoped<IEmailProvider, SendGridEmailProvider>();
+builder.Services.AddScoped<ISmsProvider, TwilioSmsProvider>();
+builder.Services.AddScoped<IMessagingProvider, MessagingProvider>();
+builder.Services.AddScoped<IOtpService, MemoryOtpService>();
+builder.Services.AddScoped<IInvoiceProvider, MockInvoiceProvider>();
+
+// B2B bulk distribution
+builder.Services.AddScoped<IBulkExcelParser, BulkExcelParser>();
+builder.Services.AddScoped<IBulkGiftCardService, BulkGiftCardService>();
+builder.Services.AddSingleton<IBulkDispatchQueue, BulkDispatchQueue>();
+builder.Services.AddScoped<INotificationService, TemplatedNotificationService>();
+builder.Services.AddHostedService<BulkDispatchWorker>();
+
+// Flight search aggregator (mock provider for now — register additional
+// IFlightSearchProvider implementations to merge real GDS data).
+builder.Services.AddScoped<IFlightSearchProvider, MockFlightSearchProvider>();
+builder.Services.AddScoped<IFlightSearchService, FlightSearchService>();
+
+// Checkout / split-payment
+builder.Services.AddScoped<IPaymentProvider, MockStripePaymentProvider>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+
+// Hotel search & booking (Stage 19) — mock provider, swappable.
+builder.Services.AddScoped<FlyGiftBackend.Services.Hotels.IHotelSearchService,
+    FlyGiftBackend.Services.Hotels.HotelSearchService>();
+
+
+// Wallet (Apple .pkpass + Google Wallet save link)
+builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddHostedService<GiftCardExpirationWorker>();
+
 
 builder.Services.AddControllers();
 
@@ -93,9 +155,13 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins(
+                  "http://localhost:3000",
+                  "http://127.0.0.1:3000"
+              )
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 

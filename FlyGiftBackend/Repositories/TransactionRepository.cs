@@ -18,5 +18,12 @@ namespace FlyGiftBackend.Repositories
         {
             return GetTable().Where(transaction => transaction.UserId == userId).ToList();
         }
+
+        public Task<List<Transaction>> GetByUserAsync(int userId) =>
+            GetTable()
+                .Include(t => t.RelatedGiftCard)
+                .Where(t => t.UserId == userId)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
     }
 }

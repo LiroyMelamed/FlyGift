@@ -14,10 +14,21 @@ namespace FlyGiftBackend.Repositories
             return context.GiftCards;
         }
 
-        // Add any GiftCard-specific methods here
         public List<GiftCard> GetGiftCardsBySenderId(int senderId)
         {
             return GetTable().Where(giftCard => giftCard.SenderId == senderId).ToList();
         }
+
+        public Task<GiftCard?> GetByIdWithUsersAsync(int id) =>
+            GetTable()
+                .Include(g => g.Sender)
+                .Include(g => g.Recipient)
+                .FirstOrDefaultAsync(g => g.Id == id);
+
+        public Task<List<GiftCard>> GetByUserAsync(int userId) =>
+            GetTable()
+                .Where(g => g.SenderId == userId || g.RecipientId == userId)
+                .OrderByDescending(g => g.CreatedAt)
+                .ToListAsync();
     }
 }
