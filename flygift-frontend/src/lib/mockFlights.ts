@@ -4,29 +4,8 @@ import type {
     FlightSearchRequest,
     FlightSearchResponse,
 } from "./flightTypes";
-
-export const MOCK_AIRPORTS: Airport[] = [
-    { iata: "TLV", name: "Ben Gurion", city: "Tel Aviv", country: "Israel" },
-    { iata: "JFK", name: "John F. Kennedy", city: "New York", country: "USA" },
-    { iata: "LAX", name: "Los Angeles Intl", city: "Los Angeles", country: "USA" },
-    { iata: "LHR", name: "Heathrow", city: "London", country: "UK" },
-    { iata: "CDG", name: "Charles de Gaulle", city: "Paris", country: "France" },
-    { iata: "FRA", name: "Frankfurt", city: "Frankfurt", country: "Germany" },
-    { iata: "DXB", name: "Dubai Intl", city: "Dubai", country: "UAE" },
-    { iata: "SIN", name: "Changi", city: "Singapore", country: "Singapore" },
-    { iata: "NRT", name: "Narita", city: "Tokyo", country: "Japan" },
-    { iata: "HND", name: "Haneda", city: "Tokyo", country: "Japan" },
-    { iata: "SFO", name: "San Francisco Intl", city: "San Francisco", country: "USA" },
-    { iata: "MIA", name: "Miami Intl", city: "Miami", country: "USA" },
-    { iata: "BCN", name: "El Prat", city: "Barcelona", country: "Spain" },
-    { iata: "FCO", name: "Fiumicino", city: "Rome", country: "Italy" },
-    { iata: "AMS", name: "Schiphol", city: "Amsterdam", country: "Netherlands" },
-    { iata: "ZRH", name: "Zurich", city: "Zurich", country: "Switzerland" },
-    { iata: "IST", name: "Istanbul Airport", city: "Istanbul", country: "Turkey" },
-    { iata: "ATH", name: "Athens Intl", city: "Athens", country: "Greece" },
-    { iata: "BKK", name: "Suvarnabhumi", city: "Bangkok", country: "Thailand" },
-    { iata: "HKG", name: "Hong Kong Intl", city: "Hong Kong", country: "Hong Kong" },
-];
+import { findAirportApi } from "./airportsApi";
+import { t } from "@/i18n/he";
 
 const CARRIERS = [
     { iata: "LY", name: "El Al", logoUrl: "/carriers/ly.svg" },
@@ -50,22 +29,11 @@ function rngFromSeed(seed: number) {
     };
 }
 
-function searchAirports(query: string, limit = 8): Airport[] {
-    const q = query.trim().toLowerCase();
-    if (!q) return MOCK_AIRPORTS.slice(0, limit);
-    return MOCK_AIRPORTS.filter(
-        (a) =>
-            a.iata.toLowerCase().includes(q) ||
-            a.city.toLowerCase().includes(q) ||
-            a.name.toLowerCase().includes(q) ||
-            a.country.toLowerCase().includes(q)
-    ).slice(0, limit);
-}
-
-function generateOffers(req: FlightSearchRequest): FlightOffer[] {
-    const origin = MOCK_AIRPORTS.find((a) => a.iata === req.origin.toUpperCase());
-    const destination = MOCK_AIRPORTS.find((a) => a.iata === req.destination.toUpperCase());
-    if (!origin || !destination) return [];
+function generateOffers(
+    req: FlightSearchRequest,
+    origin: Airport,
+    destination: Airport
+): FlightOffer[] {
 
     const seed = seedFrom(`${req.origin}-${req.destination}-${req.departureDate}`);
     const rng = rngFromSeed(seed);
@@ -144,18 +112,39 @@ function generateOffers(req: FlightSearchRequest): FlightOffer[] {
     return sorted;
 }
 
+async function resolveAirports(
+    req: FlightSearchRequest
+): Promise<{ origin: Airport; destination: Airport }> {
+    const [o, d] = await Promise.all([
+        findAirportApi(req.origin),
+        findAirportApi(req.destination),
+    ]);
+    if (!o || !d) throw new Error(t.common.dbError);
+    const toAirport = (a: NonNullable<typeof o>): Airport => ({
+        iata: a.iata,
+        name: a.name,
+        city: a.city,
+        country: a.country,
+    });
+    return { origin: toAirport(o), destination: toAirport(d) };
+}
+
 export const mockFlightApi = {
-    searchAirports,
     async search(req: FlightSearchRequest): Promise<FlightSearchResponse> {
-        await new Promise((r) => setTimeout(r, 700));
+        const { origin, destination } = await resolveAirports(req);
+        await new Promise((r) => setTimeout(r, 400));
         return {
             searchId: Math.random().toString(36).slice(2),
             generatedAt: new Date().toISOString(),
-            offers: generateOffers(req),
+            offers: generateOffers(req, origin, destination),
         };
     },
-    async getOffer(id: string, req: FlightSearchRequest): Promise<FlightOffer | undefined> {
-        const offers = generateOffers(req);
+    async getOffer(
+        id: string,
+        req: FlightSearchRequest
+    ): Promise<FlightOffer | undefined> {
+        const { origin, destination } = await resolveAirports(req);
+        const offers = generateOffers(req, origin, destination);
         return offers.find((o) => o.id === id);
     },
 };

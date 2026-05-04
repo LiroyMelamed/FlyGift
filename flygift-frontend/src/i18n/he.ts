@@ -428,6 +428,9 @@ export const t = {
         passengersShort: (n: number) => `${n} נוסעים`,
         searchFailed: "החיפוש נכשל. נסה שוב.",
         bookingFailed: "ההזמנה נכשלה. נסה שוב.",
+        dbError: "שגיאה בהתחברות למסד הנתונים",
+        searching: "מחפש…",
+        noResults: "לא נמצאו תוצאות",
         backToDashboard: "חזרה ללוח הבקרה",
         notFoundTitle: "המתנה לא נמצאה",
         notFoundDescription:

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plane, MapPin } from "lucide-react";
+import { Plane, MapPin, Loader2 } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { mockFlightApi } from "@/lib/mockFlights";
-import type { Airport } from "@/lib/flightTypes";
+import { searchAirportsApi, type GlobalAirport } from "@/lib/airportsApi";
+import { t } from "@/i18n/he";
 
 interface Props {
     label: string;
@@ -17,9 +17,8 @@ interface Props {
 }
 
 /**
- * IATA airport autocomplete. Uses the local mock directory; swap
- * the source line for `ApiUtils.get('FlightSearch/airports?q='+q)`
- * when the backend is reachable.
+ * IATA airport autocomplete. Live data via /api/airports/search
+ * (Next.js Route Handler over the bundled OurAirports dataset).
  */
 export function AirportAutocomplete({
     label,
@@ -32,6 +31,9 @@ export function AirportAutocomplete({
     const [query, setQuery] = useState(value);
     const [open, setOpen] = useState(false);
     const [activeIdx, setActiveIdx] = useState(0);
+    const [matches, setMatches] = useState<GlobalAirport[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => setQuery(value), [value]);
@@ -44,12 +46,30 @@ export function AirportAutocomplete({
         return () => document.removeEventListener("mousedown", onClick);
     }, []);
 
-    const matches: Airport[] = useMemo(
-        () => mockFlightApi.searchAirports(query, 6),
-        [query]
-    );
+    // Debounced live search.
+    useEffect(() => {
+        const controller = new AbortController();
+        const handle = setTimeout(async () => {
+            setLoading(true);
+            setFetchError(null);
+            try {
+                const results = await searchAirportsApi(query, 8, controller.signal);
+                setMatches(results);
+            } catch (err) {
+                if ((err as Error).name === "AbortError") return;
+                setFetchError((err as Error).message ?? t.common.dbError);
+                setMatches([]);
+            } finally {
+                setLoading(false);
+            }
+        }, 200);
+        return () => {
+            clearTimeout(handle);
+            controller.abort();
+        };
+    }, [query]);
 
-    const select = (a: Airport) => {
+    const select = (a: GlobalAirport) => {
         onChange(a.iata);
         setQuery(a.iata);
         setOpen(false);
@@ -113,7 +133,7 @@ export function AirportAutocomplete({
                 />
 
                 <AnimatePresence>
-                    {open && matches.length > 0 && (
+                    {open && (matches.length > 0 || loading || fetchError) && (
                         <motion.ul
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -122,6 +142,22 @@ export function AirportAutocomplete({
                             className="absolute z-[60] mt-2 w-full overflow-hidden rounded-xl border border-[#0F172A]/15 bg-white shadow-[0_20px_50px_-15px_rgba(15,23,42,0.35)]"
                             role="listbox"
                         >
+                            {loading && matches.length === 0 && (
+                                <li className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    {t.common.searching}
+                                </li>
+                            )}
+                            {fetchError && (
+                                <li className="px-3 py-3 text-xs text-danger">
+                                    {fetchError}
+                                </li>
+                            )}
+                            {!loading && !fetchError && matches.length === 0 && query.trim() && (
+                                <li className="px-3 py-3 text-xs text-slate-500">
+                                    {t.common.noResults}
+                                </li>
+                            )}
                             {matches.map((a, i) => (
                                 <li
                                     key={a.iata}
@@ -139,7 +175,7 @@ export function AirportAutocomplete({
                                         {a.iata}
                                     </span>
                                     <span className="flex-1 truncate">
-                                        <span className="text-sm text-[#0F172A]">{a.city}</span>
+                                        <span className="text-sm text-[#0F172A]">{a.cityHe || a.city}</span>
                                         <span className="mr-2 text-xs text-slate-500">
                                             {a.name}
                                         </span>

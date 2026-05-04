@@ -15,7 +15,20 @@ import {
 } from "lucide-react";
 import { t } from "@/i18n/he";
 import { cn } from "@/utils/cn";
-import { GLOBAL_AIRPORTS, searchGlobalAirports, findAirport, type GlobalAirport } from "@/lib/airports";
+import {
+    searchAirportsApi,
+    findAirportApi,
+    type GlobalAirport,
+} from "@/lib/airportsApi";
+
+const FALLBACK_AIRPORT: GlobalAirport = {
+    iata: "TLV",
+    name: "Ben Gurion",
+    city: "Tel Aviv",
+    cityHe: "תל אביב",
+    country: "Israel",
+    countryHe: "ישראל",
+};
 
 type Tab = "flights" | "hotels";
 
@@ -270,18 +283,58 @@ function Field({
 }
 
 function CityField({ label, initial }: { label: string; initial?: string }) {
-    const initialOpt = (initial ? findAirport(initial) : undefined) ?? GLOBAL_AIRPORTS[0];
+    const [selected, setSelected] = useState<GlobalAirport>(FALLBACK_AIRPORT);
     const [query, setQuery] = useState(
-        `${initialOpt.iata} — ${initialOpt.cityHe}`
+        `${FALLBACK_AIRPORT.iata} — ${FALLBACK_AIRPORT.cityHe}`
     );
     const [open, setOpen] = useState(false);
     const [highlight, setHighlight] = useState(0);
+    const [matches, setMatches] = useState<GlobalAirport[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const wrapRef = useRef<HTMLLabelElement>(null);
+    const userTypingRef = useRef(false);
 
-    const matches = searchGlobalAirports(
-        query.replace(/—.*/, "").trim(),
-        12
-    );
+    // Hydrate the initial selection from the live API.
+    useEffect(() => {
+        if (!initial) return;
+        let cancelled = false;
+        findAirportApi(initial)
+            .then((airport) => {
+                if (cancelled || !airport) return;
+                setSelected(airport);
+                setQuery(`${airport.iata} — ${airport.cityHe}`);
+            })
+            .catch(() => {/* fallback already set */});
+        return () => {
+            cancelled = true;
+        };
+    }, [initial]);
+
+    // Debounced live search.
+    useEffect(() => {
+        if (!userTypingRef.current) return;
+        const controller = new AbortController();
+        const handle = setTimeout(async () => {
+            setLoading(true);
+            setFetchError(null);
+            try {
+                const term = query.replace(/—.*/, "").trim();
+                const results = await searchAirportsApi(term, 12, controller.signal);
+                setMatches(results);
+            } catch (err) {
+                if ((err as Error).name === "AbortError") return;
+                setFetchError((err as Error).message ?? t.common.dbError);
+                setMatches([]);
+            } finally {
+                setLoading(false);
+            }
+        }, 200);
+        return () => {
+            clearTimeout(handle);
+            controller.abort();
+        };
+    }, [query]);
 
     useEffect(() => {
         const onClick = (e: MouseEvent) => {
@@ -294,9 +347,14 @@ function CityField({ label, initial }: { label: string; initial?: string }) {
     }, []);
 
     const select = (opt: GlobalAirport) => {
+        setSelected(opt);
         setQuery(`${opt.iata} — ${opt.cityHe}`);
         setOpen(false);
+        userTypingRef.current = false;
     };
+
+    // Tag for unused-var lint; kept to support future programmatic readers.
+    void selected;
 
     return (
         <label className="relative block space-y-1.5" ref={wrapRef}>
@@ -309,6 +367,7 @@ function CityField({ label, initial }: { label: string; initial?: string }) {
                     type="text"
                     value={query}
                     onChange={(e) => {
+                        userTypingRef.current = true;
                         setQuery(e.target.value);
                         setOpen(true);
                         setHighlight(0);
@@ -335,7 +394,7 @@ function CityField({ label, initial }: { label: string; initial?: string }) {
             </span>
 
             <AnimatePresence>
-                {open && matches.length > 0 && (
+                {open && (matches.length > 0 || loading || fetchError) && (
                     <motion.ul
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -344,6 +403,16 @@ function CityField({ label, initial }: { label: string; initial?: string }) {
                         className="absolute right-0 left-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-[#0a1330]/95 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.6)] backdrop-blur-xl"
                         role="listbox"
                     >
+                        {loading && matches.length === 0 && (
+                            <li className="px-3 py-2.5 text-xs text-text-secondary">
+                                {t.common.searching}
+                            </li>
+                        )}
+                        {fetchError && (
+                            <li className="px-3 py-2.5 text-xs text-danger">
+                                {fetchError}
+                            </li>
+                        )}
                         {matches.map((opt, i) => (
                             <li key={opt.iata}>
                                 <button
