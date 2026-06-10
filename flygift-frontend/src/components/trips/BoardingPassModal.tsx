@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Plane } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { t } from "@/i18n/he";
 import type { Trip } from "@/lib/tripTypes";
 
 interface Props {
@@ -46,13 +47,13 @@ export function BoardingPassModal({ trip, onClose }: Props) {
                                 <div className="flex items-center gap-2 text-white">
                                     <Plane className="h-4 w-4" />
                                     <span className="text-xs font-semibold uppercase tracking-[0.2em]">
-                                        Boarding Pass
+                                        {t.flights.boardingPass}
                                     </span>
                                 </div>
                                 <button
                                     onClick={onClose}
                                     className="rounded-full p-1 text-white/80 hover:bg-white/15"
-                                    aria-label="Close"
+                                    aria-label={t.trips.cell.close}
                                 >
                                     <X className="h-4 w-4" />
                                 </button>
@@ -76,15 +77,15 @@ export function BoardingPassModal({ trip, onClose }: Props) {
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-3 text-xs">
-                                    <Cell label="Passenger" value="—" />
-                                    <Cell label="Flight" value={trip.flightNumber} mono />
-                                    <Cell label="Class" value="Economy" />
-                                    <Cell label="Gate" value={trip.gate ?? "—"} mono />
-                                    <Cell label="Seat" value={trip.seat ?? "—"} mono />
-                                    <Cell label="Term." value={trip.terminal ?? "—"} />
-                                    <Cell label="Depart" value={fmt(trip.departureUtc)} />
-                                    <Cell label="Arrive" value={fmt(trip.arrivalUtc)} />
-                                    <Cell label="Ref" value={trip.bookingReference ?? "—"} mono />
+                                    <Cell label={t.flights.passengerLabel} value="—" />
+                                    <Cell label={t.flights.flight} value={trip.flightNumber} mono />
+                                    <Cell label={t.trips.cell.cabinClass} value={t.trips.cell.cabinEconomy} />
+                                    <Cell label={t.flights.gate} value={trip.gate ?? "—"} mono />
+                                    <Cell label={t.flights.seat} value={trip.seat ?? "—"} mono />
+                                    <Cell label={t.trips.cell.terminal} value={trip.terminal ?? "—"} />
+                                    <Cell label={t.flights.depart2} value={fmt(trip.departureUtc)} />
+                                    <Cell label={t.trips.cell.arrive} value={fmt(trip.arrivalUtc)} />
+                                    <Cell label={t.trips.cell.ref} value={trip.bookingReference ?? "—"} mono />
                                 </div>
                             </div>
 

@@ -259,8 +259,6 @@ function Row({
  * No native PDF library is required; the print stylesheet is inline.
  */
 function downloadBoardingPass(result: BookFlightResult, dep: Date) {
-    const w = window.open("", "_blank", "noopener,width=720,height=900");
-    if (!w) return;
     const route = result.route;
     const departLabel = dep.toLocaleString("he-IL", {
         weekday: "long",
@@ -349,9 +347,22 @@ function downloadBoardingPass(result: BookFlightResult, dep: Date) {
   </div>
 </body>
 </html>`;
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+
+    // Open via Blob URL instead of `window.open("") + document.write`.
+    // `noopener` (which we want to keep, for security) severs the opener
+    // channel, making document.write a silent no-op — the user ended up
+    // staring at about:blank. With a Blob URL the content travels in the
+    // URL itself, so noopener is fine.
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank", "noopener,width=720,height=900");
+    if (!w) {
+        // Popup blocker — fall back to a same-tab navigation so the user
+        // still gets the boarding pass.
+        window.location.href = url;
+    }
+    // Give the new window time to load before we drop the URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function escapeHtml(s: string) {

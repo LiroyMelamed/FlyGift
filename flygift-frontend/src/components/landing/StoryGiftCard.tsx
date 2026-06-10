@@ -4,9 +4,27 @@ import { useRef } from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Sparkles, ArrowLeft, MousePointer2 } from "lucide-react";
-import { GiftCard3D } from "@/components/giftcard/GiftCard3D";
-import { MOCK_GIFT_CARDS } from "@/lib/mockData";
+import { LuxuryGiftCard } from "@/components/giftcard/LuxuryGiftCard";
+import type { MockGiftCard } from "@/lib/mockData";
 import { t } from "@/i18n/he";
+
+// Static showcase card for the landing page. Not a real gift — the
+// landing page renders before any user is logged in or any DB data
+// exists, so we keep an inline fixture rather than fetching one.
+const FEATURED_CARD: MockGiftCard = {
+    id: "showcase",
+    code: "FG-DEMO-CARD",
+    amount: 750,
+    currency: "ILS",
+    status: "Active",
+    variant: "gold-champagne",
+    category: "Hotels",
+    senderName: "FlyGift Rewards",
+    recipientName: "לירוי מלמד",
+    expirationDate: "2027-02-14T00:00:00Z",
+    createdAt: "2026-03-01T18:05:00Z",
+    message: "תיהנו מלינה יוקרתית על חשבוננו.",
+};
 
 export function StoryGiftCard() {
     const ref = useRef<HTMLDivElement>(null);
@@ -20,7 +38,7 @@ export function StoryGiftCard() {
     const y = useTransform(scrollYProgress, [0, 1], ["10%", "-10%"]);
     const float = useTransform(scrollYProgress, [0, 0.5, 1], [10, -10, 10]);
 
-    const featuredCard = MOCK_GIFT_CARDS[1] ?? MOCK_GIFT_CARDS[0];
+    const featuredCard = FEATURED_CARD;
 
     return (
         <section
@@ -59,7 +77,7 @@ export function StoryGiftCard() {
                         style={{ rotateY: rotate, y: float, transformPerspective: 1400 }}
                         className="relative w-full max-w-md"
                     >
-                        <GiftCard3D card={featuredCard} />
+                        <LuxuryGiftCard card={featuredCard} />
                     </motion.div>
 
                     <motion.div

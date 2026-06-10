@@ -25,7 +25,7 @@ namespace FlyGiftBackend.Models
         public decimal TotalCharged { get; set; }
 
         [MaxLength(8)]
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
 
         /// <summary>External invoice id (e.g. "INV-2026-0042").</summary>
         [MaxLength(64)]

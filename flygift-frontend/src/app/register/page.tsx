@@ -6,15 +6,19 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, ShieldCheck, UserPlus } from "lucide-react";
 import { ApiUtils } from "@/utils/ApiUtils";
+import { hydrateUserFromJwt } from "@/lib/appStore";
+import { decodeJwt } from "@/utils/jwt";
 import { t } from "@/i18n/he";
 
-function setAuthCookie(token: string) {
-    document.cookie =
-        `flygift_token=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+interface AuthEnvelope {
+    success: boolean;
+    response?: string;
+    data?: string;  // JWT token, only set on Login
 }
 
 export default function RegisterPage() {
     const router = useRouter();
+    const [fullName, setFullName] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
@@ -24,30 +28,66 @@ export default function RegisterPage() {
     const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError(null);
+
+        // Mirror the server-side validators on RegisterRequest so the user
+        // gets fast feedback without a round-trip. Backend remains the
+        // authority — these checks are UX, not security.
+        const trimmedName = fullName.trim();
+        if (trimmedName.length < 2) {
+            setError("נא למלא שם מלא (לפחות 2 תווים)");
+            return;
+        }
+        if (username.trim().length < 3) {
+            setError("שם משתמש חייב להיות באורך של לפחות 3 תווים");
+            return;
+        }
+        if (password.length < 6) {
+            setError("סיסמה חייבת להיות באורך של לפחות 6 תווים");
+            return;
+        }
         if (password !== confirm) {
             setError("הסיסמאות לא תואמות");
             return;
         }
+
         setLoading(true);
         try {
-            const res = await ApiUtils.post("Auth/Register", {
-                Username: username,
-                PasswordHash: password,
-            }).startRequest();
+            // 1. Create the account. Backend payload (matches RegisterRequest):
+            //    { username, passwordHash, fullName, email?, role? }
+            // FullName is required end-to-end; the User row stores
+            // FirstName/LastName split server-side.
+            const reg = (await ApiUtils.post("Auth/Register", {
+                username: username.trim(),
+                passwordHash: password,
+                fullName: trimmedName,
+            }).startRequest()) as AuthEnvelope;
 
-            const token =
-                (res?.data as string | undefined) ??
-                (res?.Data as string | undefined);
-            const ok = res?.success ?? res?.Success;
+            if (!reg?.success) {
+                throw new Error(reg?.response || "ההרשמה נכשלה. נסו שוב.");
+            }
 
-            if (ok && token) {
-                ApiUtils.setAuthorizationHeader(token);
-                setAuthCookie(token);
-                router.replace("/dashboard");
+            // 2. Auto-login so the HttpOnly auth cookie is set server-side.
+            //    /Auth/Register doesn't set the cookie itself — only /Login
+            //    does — so without this step the new account would be
+            //    redirected to the dashboard with no session.
+            const login = (await ApiUtils.post("Auth/Login", {
+                username,
+                passwordHash: password,
+            }).startRequest()) as AuthEnvelope;
+
+            if (!login?.success || !login.data) {
+                // The account was created but auto-login failed; bounce them
+                // to the login page so they can try manually.
+                router.replace("/login?registered=1");
                 return;
             }
-            // Backend may not auto-login: try login, otherwise redirect to /
-            router.replace("/?registered=1");
+
+            ApiUtils.setAuthorizationHeader(login.data); // for native clients
+            const claims = decodeJwt(login.data);
+            hydrateUserFromJwt();
+
+            const dest = claims?.role === "Company" ? "/company/dashboard" : "/dashboard";
+            router.replace(dest);
         } catch (err) {
             const msg =
                 err instanceof Error && err.message
@@ -86,6 +126,13 @@ export default function RegisterPage() {
                     </div>
 
                     <form onSubmit={onSubmit} className="space-y-3">
+                        <FieldText
+                            label={t.profile.fullName}
+                            type="text"
+                            value={fullName}
+                            onChange={setFullName}
+                            autoComplete="name"
+                        />
                         <FieldText
                             label={t.auth.username}
                             type="text"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Plane, Wallet, QrCode, Activity } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -7,12 +8,15 @@ import { GhostButton } from "@/components/ui/Buttons";
 import { FlightStatusBadge } from "./FlightStatusBadge";
 import { formatCurrencyDetailed } from "@/utils/format";
 import { nativeBridge } from "@/utils/nativeBridge";
+import { openAppleWalletPass, openGoogleWalletPass } from "@/utils/walletPass";
+import { t } from "@/i18n/he";
 import type { Trip } from "@/lib/tripTypes";
 
 interface Props {
     trip: Trip;
     index?: number;
     onShowBoardingPass: (t: Trip) => void;
+    onShowStatus: (t: Trip) => void;
 }
 
 const fmtTime = (iso?: string) =>
@@ -33,25 +37,34 @@ const fmtDate = (iso?: string) =>
         })
         : "—";
 
-const apiBase =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_BASE_URL) || "";
+export function TripCard({ trip, index = 0, onShowBoardingPass, onShowStatus }: Props) {
+    const [walletError, setWalletError] = useState<string | null>(null);
+    const [walletLoading, setWalletLoading] = useState<"apple" | "google" | null>(null);
 
-export function TripCard({ trip, index = 0, onShowBoardingPass }: Props) {
-    const handleAppleWallet = () => {
+    const handleAppleWallet = async () => {
         nativeBridge.haptic("light");
-        nativeBridge.openWallet({
-            type: "apple",
-            url: `${apiBase}/api/Bookings/${trip.bookingId}/wallet-pass`,
-        });
+        setWalletError(null);
+        setWalletLoading("apple");
+        try {
+            await openAppleWalletPass(trip.bookingId);
+        } catch (e) {
+            setWalletError(e instanceof Error ? e.message : t.trips.walletFailed);
+        } finally {
+            setWalletLoading(null);
+        }
     };
 
     const handleGoogleWallet = async () => {
         nativeBridge.haptic("light");
-        // In prod: GET /api/Bookings/{id}/wallet-link/google → { url }
-        nativeBridge.openWallet({
-            type: "google",
-            url: `${apiBase}/api/Bookings/${trip.bookingId}/wallet-link/google`,
-        });
+        setWalletError(null);
+        setWalletLoading("google");
+        try {
+            await openGoogleWalletPass(trip.bookingId);
+        } catch (e) {
+            setWalletError(e instanceof Error ? e.message : t.trips.walletFailed);
+        } finally {
+            setWalletLoading(null);
+        }
     };
 
     return (
@@ -61,10 +74,10 @@ export function TripCard({ trip, index = 0, onShowBoardingPass }: Props) {
             transition={{ duration: 0.3, delay: index * 0.05 }}
             className="relative"
         >
-            {/* Timeline dot */}
+            {/* Timeline dot — inline-start side (right in RTL) */}
             <span
                 aria-hidden
-                className="absolute -left-[27px] top-6 hidden h-3 w-3 rounded-full bg-cyan-jet shadow-glow-cyan ring-4 ring-bg-base sm:block"
+                className="absolute -start-[27px] top-6 hidden h-3 w-3 rounded-full bg-cyan-jet shadow-glow-cyan ring-4 ring-bg-base sm:block"
             />
 
             <GlassCard padding="md" tone="elevated" interactive className="space-y-4">
@@ -100,19 +113,28 @@ export function TripCard({ trip, index = 0, onShowBoardingPass }: Props) {
                 </div>
 
                 {/* Mid: gate / seat / ref / total */}
-                <div className="grid grid-cols-4 gap-2 rounded-xl bg-white/[0.03] p-3 text-xs">
-                    <Cell label="Gate" value={trip.gate ?? "—"} />
-                    <Cell label="Seat" value={trip.seat ?? "—"} />
-                    <Cell label="Ref" value={trip.bookingReference ?? "—"} mono />
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/[0.03] p-3 text-xs sm:grid-cols-4">
+                    <Cell label={t.flights.gate} value={trip.gate ?? "—"} />
+                    <Cell label={t.flights.seat} value={trip.seat ?? "—"} />
+                    <Cell label={t.trips.cell.ref} value={trip.bookingReference ?? "—"} mono />
                     <Cell
-                        label="Paid"
+                        label={t.trips.cell.paid}
                         value={
                             trip.totalCharged != null
-                                ? formatCurrencyDetailed(trip.totalCharged, "USD")
+                                ? formatCurrencyDetailed(
+                                    trip.totalCharged,
+                                    trip.currency ?? "ILS"
+                                )
                                 : "—"
                         }
                     />
                 </div>
+
+                {walletError && (
+                    <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                        {walletError}
+                    </p>
+                )}
 
                 {/* Actions */}
                 {trip.isUpcoming && (
@@ -126,31 +148,36 @@ export function TripCard({ trip, index = 0, onShowBoardingPass }: Props) {
                             className="!h-10 !px-3 text-xs"
                         >
                             <QrCode className="h-3.5 w-3.5" />
-                            Boarding Pass
+                            {t.flights.boardingPass}
                         </GhostButton>
                         <GhostButton
                             type="button"
                             onClick={handleAppleWallet}
+                            disabled={walletLoading !== null}
                             className="!h-10 !px-3 text-xs"
                         >
                             <Wallet className="h-3.5 w-3.5" />
-                            Apple Wallet
+                            {walletLoading === "apple" ? t.common.loading : t.trips.cell.appleWallet}
                         </GhostButton>
                         <GhostButton
                             type="button"
                             onClick={handleGoogleWallet}
+                            disabled={walletLoading !== null}
                             className="!h-10 !px-3 text-xs"
                         >
                             <Wallet className="h-3.5 w-3.5" />
-                            Google Wallet
+                            {walletLoading === "google" ? t.common.loading : t.trips.cell.googleWallet}
                         </GhostButton>
                         <GhostButton
                             type="button"
-                            onClick={() => nativeBridge.haptic("light")}
+                            onClick={() => {
+                                nativeBridge.haptic("light");
+                                onShowStatus(trip);
+                            }}
                             className="!h-10 !px-3 text-xs"
                         >
                             <Activity className="h-3.5 w-3.5" />
-                            Status
+                            {t.flights.status}
                         </GhostButton>
                     </div>
                 )}

@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Hotel,
     Search,
-    Calendar,
     Users,
     Star,
     MapPin,
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PrimaryButton, GhostButton } from "@/components/ui/Buttons";
-import { TextField } from "@/components/ui/FormFields";
+import { TextField, DateField } from "@/components/ui/FormFields";
 import { ApiUtils } from "@/utils/ApiUtils";
 import { formatCurrencyDetailed } from "@/utils/format";
 import { t } from "@/i18n/he";
@@ -137,7 +136,7 @@ export default function HotelsPage() {
                 transition={{ delay: 0.05 }}
             >
                 <GlassCard padding="lg" tone="elevated" glow="gold" className="space-y-4">
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_0.7fr]">
+                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_0.7fr]">
                         <div className="space-y-1.5">
                             <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary text-start">
                                 {t.hotels.cityLabel}
@@ -237,36 +236,6 @@ export default function HotelsPage() {
                     />
                 )}
             </AnimatePresence>
-        </div>
-    );
-}
-
-function DateField({
-    label,
-    value,
-    min,
-    onChange,
-}: {
-    label: string;
-    value: string;
-    min: string;
-    onChange: (v: string) => void;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary text-start">
-                {label}
-            </label>
-            <div className="relative">
-                <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gold-champagne" />
-                <input
-                    type="date"
-                    value={value}
-                    min={min}
-                    onChange={(e) => onChange(e.target.value)}
-                    className="w-full rounded-xl border border-[#0F172A]/20 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] pr-10 pl-3 py-3 text-base text-[#0F172A] dark:text-text-primary focus:outline-none focus:border-gold-champagne/60 focus:bg-white/90 dark:focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(212,175,122,0.16)]"
-                />
-            </div>
         </div>
     );
 }

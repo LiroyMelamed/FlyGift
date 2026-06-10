@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { GiftCard3D } from "./GiftCard3D";
+import { LuxuryGiftCard } from "./LuxuryGiftCard";
 import { cn } from "@/utils/cn";
 import { nativeBridge } from "@/utils/nativeBridge";
 import type { MockGiftCard } from "@/lib/mockData";
@@ -60,7 +60,10 @@ export function GiftCardCarousel({
                         className="absolute inset-0 flex items-center justify-center px-4"
                     >
                         <div className="w-full max-w-md">
-                            <GiftCard3D card={current} onClick={() => onSelect?.(current)} />
+                            <LuxuryGiftCard
+                                card={current}
+                                onClick={() => onSelect?.(current)}
+                            />
                         </div>
                     </motion.div>
                 </AnimatePresence>

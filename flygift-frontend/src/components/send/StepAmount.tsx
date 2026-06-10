@@ -1,11 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plane, Hotel, Sparkles, type LucideIcon } from "lucide-react";
-import { GiftCard3D } from "@/components/giftcard/GiftCard3D";
+import { LuxuryGiftCard } from "@/components/giftcard/LuxuryGiftCard";
 import { TextField } from "@/components/ui/FormFields";
 import { cn } from "@/utils/cn";
-import type { GiftCardVariant, MockGiftCard } from "@/lib/mockData";
+import type { MockGiftCard } from "@/lib/mockData";
 import type { GiftDraft } from "./types";
 
 interface Props {
@@ -15,43 +14,6 @@ interface Props {
 }
 
 const PRESETS = [50, 100, 250, 500, 1000];
-
-const VARIANT_OPTIONS: Array<{
-    variant: GiftCardVariant;
-    category: MockGiftCard["category"];
-    label: string;
-    categoryLabel: string;
-    icon: LucideIcon;
-    swatch: string;
-}> = [
-        {
-            variant: "cyan-jet",
-            category: "Flights",
-            label: "סיאן ג'ט",
-            categoryLabel: "טיסות",
-            icon: Plane,
-            swatch:
-                "linear-gradient(135deg, #0066FF 0%, #00E5FF 60%, #5BF0FF 100%)",
-        },
-        {
-            variant: "gold-champagne",
-            category: "Hotels",
-            label: "גולד שמפן",
-            categoryLabel: "מלונות",
-            icon: Hotel,
-            swatch:
-                "linear-gradient(135deg, #4A2E0A 0%, #B7894C 55%, #D4AF7A 100%)",
-        },
-        {
-            variant: "violet-aurora",
-            category: "Travel",
-            label: "ויולט אורורה",
-            categoryLabel: "טיולים",
-            icon: Sparkles,
-            swatch:
-                "linear-gradient(135deg, #3A1E8A 0%, #7C5CFF 55%, #B89CFF 100%)",
-        },
-    ];
 
 export function StepAmount({ draft, setDraft, errors }: Props) {
     const previewCard: MockGiftCard = {
@@ -78,7 +40,7 @@ export function StepAmount({ draft, setDraft, errors }: Props) {
         >
             <header className="space-y-1 text-center">
                 <h2 className="font-display text-xl font-semibold text-[#0F172A]">
-                    בחירת סכום ועיצוב
+                    בחירת סכום
                 </h2>
                 <p className="text-sm text-[#0F172A]/70">
                     התצוגה מתעדכנת בזמן אמת.
@@ -87,7 +49,7 @@ export function StepAmount({ draft, setDraft, errors }: Props) {
 
             {/* Live preview */}
             <div className="flex justify-center">
-                <GiftCard3D card={previewCard} className="w-full max-w-sm" />
+                <LuxuryGiftCard card={previewCard} interactive={false} className="w-full max-w-sm" />
             </div>
 
             {/* Amount */}
@@ -110,13 +72,13 @@ export function StepAmount({ draft, setDraft, errors }: Props) {
                                         : "bg-white border border-[#0F172A]/10 text-[#0F172A] hover:bg-[#0EA5E9]/5"
                                 )}
                             >
-                                ₪{p}
+                                ${p}
                             </button>
                         );
                     })}
                 </div>
                 <TextField
-                    label="סכום מותאם אישית (₪)"
+                    label="סכום מותאם אישית ($)"
                     type="number"
                     inputMode="decimal"
                     min={1}
@@ -128,54 +90,6 @@ export function StepAmount({ draft, setDraft, errors }: Props) {
                     }
                     error={errors.amount}
                 />
-            </div>
-
-            {/* Theme picker */}
-            <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-[#0F172A]/70 text-center">
-                    עיצוב הכרטיס
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                    {VARIANT_OPTIONS.map((opt) => {
-                        const Icon = opt.icon;
-                        const active = draft.variant === opt.variant;
-                        return (
-                            <motion.button
-                                key={opt.variant}
-                                whileTap={{ scale: 0.97 }}
-                                type="button"
-                                onClick={() =>
-                                    setDraft({
-                                        ...draft,
-                                        variant: opt.variant,
-                                        category: opt.category,
-                                    })
-                                }
-                                className={cn(
-                                    "ring-focus relative overflow-hidden rounded-2xl p-3 text-left transition-all",
-                                    active
-                                        ? "border-2 border-cyan-jet shadow-glow-cyan"
-                                        : "border border-white/10 hover:border-white/20"
-                                )}
-                            >
-                                <div
-                                    aria-hidden
-                                    className="mb-3 h-12 w-full rounded-lg"
-                                    style={{ background: opt.swatch }}
-                                />
-                                <div className="flex items-center gap-1.5">
-                                    <Icon className="h-3.5 w-3.5 text-text-secondary" />
-                                    <p className="text-xs font-semibold text-text-primary">
-                                        {opt.label}
-                                    </p>
-                                </div>
-                                <p className="mt-0.5 text-[10px] text-text-secondary">
-                                    {opt.categoryLabel}
-                                </p>
-                            </motion.button>
-                        );
-                    })}
-                </div>
             </div>
         </motion.div>
     );

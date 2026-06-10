@@ -26,7 +26,7 @@ namespace FlyGiftBackend.Services.Hotels
         public int Nights { get; set; }
         public string City { get; set; } = "";
         public decimal AccountBalance { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
         public List<HotelOffer> Offers { get; set; } = new();
     }
 
@@ -42,7 +42,7 @@ namespace FlyGiftBackend.Services.Hotels
         public List<string> Amenities { get; set; } = new();
         public decimal NightlyRate { get; set; }
         public decimal TotalPrice { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
         public bool AffordableFromBalance { get; set; }
         public decimal CardTopUpRequired { get; set; }
     }
@@ -51,7 +51,6 @@ namespace FlyGiftBackend.Services.Hotels
     {
         public string OfferId { get; set; } = "";
         public string GuestName { get; set; } = "";
-        public string? PaymentMethodToken { get; set; }
     }
 
     public class BookHotelResult
@@ -67,6 +66,6 @@ namespace FlyGiftBackend.Services.Hotels
         public decimal PaidFromBalance { get; set; }
         public decimal PaidFromCard { get; set; }
         public decimal RemainingBalance { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
     }
 }

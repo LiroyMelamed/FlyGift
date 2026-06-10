@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
     Download,
@@ -8,13 +9,24 @@ import {
     Clock,
     AlertTriangle,
     ExternalLink,
+    Plus,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { GhostButton } from "@/components/ui/Buttons";
+import { GhostButton, PrimaryButton } from "@/components/ui/Buttons";
 import { formatCurrencyDetailed } from "@/utils/format";
-import { MOCK_INVOICES } from "@/lib/mockInvoices";
+import { ApiUtils } from "@/utils/ApiUtils";
 import { t } from "@/i18n/he";
+import { DepositModal } from "./DepositModal";
 import type { BulkOrderStatus, InvoiceDto } from "@/lib/billingTypes";
+
+/**
+ * Build the API download URL for an invoice. Replaces the legacy
+ * `https://invoices.flygift.app/...` mock URL that doesn't resolve on
+ * localhost. Backend route: `/api/Company/Billing/Invoices/{id}/Download`.
+ */
+function invoiceDownloadHref(id: number): string {
+    return `${ApiUtils.getBaseUrl()}/Company/Billing/Invoices/${id}/Download`;
+}
 
 const fmtDate = (iso: string) =>
     new Date(iso).toLocaleDateString("he-IL", {
@@ -44,12 +56,48 @@ const STATUS: Record<
     },
 };
 
+interface InvoicesPayload {
+    invoices: InvoiceDto[];
+    summary: { count: number; totalInvoiced: number; pending: number; failed: number };
+}
+
+interface InvoicesEnvelope {
+    success: boolean;
+    response?: string;
+    data?: InvoicesPayload;
+}
+
 /**
- * Stage 17 — Billing tab. Replace MOCK_INVOICES with
- * `ApiUtils.get('Company/Billing/Invoices').startRequest()` once reachable.
+ * Stage 17 — Billing tab. נטען נתונים מה-API בלבד.
  */
 export function BillingView() {
-    const data = MOCK_INVOICES;
+    const [data, setData] = useState<InvoicesPayload | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [depositOpen, setDepositOpen] = useState(false);
+
+    useEffect(() => {
+        setLoading(true);
+        ApiUtils.get('Company/Billing/Invoices').startRequest()
+            .then((res) => {
+                const env = res as InvoicesEnvelope | undefined;
+                if (env?.success && env.data) {
+                    setData(env.data);
+                } else {
+                    setError(env?.response ?? 'שגיאה בטעינת חשבוניות');
+                }
+                setLoading(false);
+            })
+            .catch(() => {
+                setError('שגיאה בטעינת חשבוניות');
+                setLoading(false);
+            });
+    }, []);
+
+    if (loading) return <div className="py-10 text-center">טוען חשבוניות…</div>;
+    if (error) return <div className="py-10 text-center text-danger">{error}</div>;
+    if (!data || !data.invoices?.length) return <div className="py-10 text-center">אין חשבוניות להצגה.</div>;
+
     const currency = data.invoices[0]?.currency ?? "USD";
 
     return (
@@ -57,17 +105,27 @@ export function BillingView() {
             <motion.header
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-1"
+                className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
             >
-                <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-jet">
-                    {t.billing.kicker}
-                </p>
-                <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-                    <span className="text-gradient-skyline">{t.billing.title}</span>
-                </h1>
-                <p className="text-sm text-text-secondary">
-                    {t.billing.subtitle}
-                </p>
+                <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-jet">
+                        {t.billing.kicker}
+                    </p>
+                    <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
+                        <span className="text-gradient-skyline">{t.billing.title}</span>
+                    </h1>
+                    <p className="text-sm text-text-secondary">{t.billing.subtitle}</p>
+                </div>
+                <PrimaryButton
+                    type="button"
+                    onClick={() => setDepositOpen(true)}
+                    className="!h-10 !w-auto !px-4 text-sm"
+                >
+                    <span className="inline-flex items-center gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        טעינת יתרה
+                    </span>
+                </PrimaryButton>
             </motion.header>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -98,10 +156,10 @@ export function BillingView() {
             </div>
 
             <GlassCard padding="none" tone="elevated" className="overflow-hidden">
-                {/* Header (md+) */}
-                <div className="hidden grid-cols-[1.4fr_1fr_0.7fr_0.9fr_0.9fr_120px] gap-3 border-b border-white/[0.05] px-5 py-3 text-[10px] uppercase tracking-wider text-text-secondary md:grid">
+                {/* Header — horizontal at sm+ (no batchId), full 6-col at md+. */}
+                <div className="hidden gap-3 border-b border-white/[0.05] px-5 py-3 text-[10px] uppercase tracking-wider text-text-secondary sm:grid sm:grid-cols-[1.6fr_0.7fr_0.9fr_0.9fr_120px] md:grid-cols-[1.4fr_1fr_0.7fr_0.9fr_0.9fr_120px]">
                     <span>{t.billing.columns.invoice}</span>
-                    <span>{t.billing.columns.batch}</span>
+                    <span className="hidden md:inline">{t.billing.columns.batch}</span>
                     <span className="text-right">{t.billing.columns.recipients}</span>
                     <span className="text-right">{t.billing.columns.amount}</span>
                     <span>{t.billing.columns.status}</span>
@@ -114,19 +172,27 @@ export function BillingView() {
                     ))}
                 </ul>
             </GlassCard>
+
+            <DepositModal
+                open={depositOpen}
+                onClose={() => setDepositOpen(false)}
+            />
         </div>
     );
 }
 
 function InvoiceRow({ inv, index }: { inv: InvoiceDto; index: number }) {
     const status = STATUS[inv.status];
-    const downloadable = !!inv.invoiceUrl;
+    // The "downloadable" gate is the issued invoice number, not the URL —
+    // the URL is now synthesized from the row id (invoiceDownloadHref) so
+    // localhost works regardless of what the legacy mock data carried.
+    const downloadable = !!inv.invoiceNumber;
     return (
         <motion.li
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.03 }}
-            className="grid grid-cols-1 gap-3 px-5 py-4 hover:bg-white/[0.02] md:grid-cols-[1.4fr_1fr_0.7fr_0.9fr_0.9fr_120px] md:items-center"
+            className="grid grid-cols-1 gap-3 px-5 py-4 hover:bg-white/[0.02] sm:grid-cols-[1.6fr_0.7fr_0.9fr_0.9fr_120px] sm:items-center md:grid-cols-[1.4fr_1fr_0.7fr_0.9fr_0.9fr_120px]"
         >
             <div className="flex items-center gap-3">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
@@ -143,7 +209,9 @@ function InvoiceRow({ inv, index }: { inv: InvoiceDto; index: number }) {
                 </div>
             </div>
 
-            <p className="truncate font-mono text-[11px] text-text-secondary md:text-xs">
+            {/* The full UUID is information-dense and useless on phones —
+                hide until md+ where the column reappears in the grid. */}
+            <p className="hidden truncate font-mono text-[11px] text-text-secondary md:block md:text-xs">
                 {inv.batchId}
             </p>
 
@@ -162,10 +230,10 @@ function InvoiceRow({ inv, index }: { inv: InvoiceDto; index: number }) {
                 {status.label}
             </span>
 
-            <div className="flex justify-start md:justify-end">
+            <div className="flex justify-start sm:justify-end">
                 {downloadable ? (
                     <a
-                        href={inv.invoiceUrl!}
+                        href={invoiceDownloadHref(inv.id)}
                         target="_blank"
                         rel="noreferrer noopener"
                         className="inline-flex items-center gap-1.5 rounded-full border border-cyan-jet/40 bg-cyan-jet/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-jet transition-colors hover:bg-cyan-jet/20"

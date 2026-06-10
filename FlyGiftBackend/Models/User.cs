@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace FlyGiftBackend.Models
 {
@@ -10,6 +11,9 @@ namespace FlyGiftBackend.Models
 
         public string? Email { get; set; }
 
+        // Never serialize. Endpoints that .Include(g => g.Sender/Recipient)
+        // (e.g. GiftCard/Mine) would otherwise leak the bcrypt hash.
+        [JsonIgnore]
         public string PasswordHash { get; set; }
 
         public string? FirstName { get; set; }

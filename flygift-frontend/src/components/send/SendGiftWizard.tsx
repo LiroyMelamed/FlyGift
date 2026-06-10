@@ -14,6 +14,8 @@ import { StepSuccess } from "./StepSuccess";
 import { DEFAULT_DRAFT, STEP_LABELS, type GiftDraft, type StepKey } from "./types";
 import { useSendGift } from "@/hooks/useSendGift";
 import { nativeBridge } from "@/utils/nativeBridge";
+import { TopUpModal } from "@/components/wallet/TopUpModal";
+import { recordTopUp } from "@/lib/appStore";
 
 const ORDER: StepKey[] = ["recipient", "amount", "review", "success"];
 
@@ -32,8 +34,8 @@ function validateStep(
     }
     if (step === "amount") {
         if (!draft.amount || draft.amount < 1)
-            errs.amount = "סכום מינימאלי: ₪1";
-        if (draft.amount > 10000) errs.amount = "סכום מקסימאלי: ₪10,000";
+            errs.amount = "סכום מינימאלי: $1";
+        if (draft.amount > 10000) errs.amount = "סכום מקסימאלי: $10,000";
     }
     return errs;
 }
@@ -44,10 +46,27 @@ export function SendGiftWizard() {
     const [errors, setErrors] = useState<Partial<Record<keyof GiftDraft, string>>>(
         {}
     );
-    const { send, isLoading, result } = useSendGift();
+    const [topUp, setTopUp] = useState<{
+        missingAmount: number;
+        currency: string;
+    } | null>(null);
+    const { send, isLoading, result, error: sendError } = useSendGift();
 
     const idx = ORDER.indexOf(step);
     const labels = ORDER.slice(0, 3).map((k) => STEP_LABELS[k as Exclude<StepKey, "success">]);
+
+    const submitGift = async () => {
+        return send({
+            recipientName: draft.recipientName,
+            recipientEmail: draft.recipientEmail,
+            message: draft.message,
+            amount: draft.amount,
+            currency: draft.currency,
+            variant: draft.variant,
+            category: draft.category,
+            expirationDate: draft.expirationDate,
+        });
+    };
 
     const goNext = async () => {
         const e = validateStep(step, draft);
@@ -60,23 +79,40 @@ export function SendGiftWizard() {
         nativeBridge.haptic("light");
 
         if (step === "review") {
-            const res = await send({
-                recipientName: draft.recipientName,
-                recipientEmail: draft.recipientEmail,
-                message: draft.message,
-                amount: draft.amount,
-                currency: draft.currency,
-                variant: draft.variant,
-                category: draft.category,
-                expirationDate: draft.expirationDate,
-            });
-            if (res.success) setStep("success");
-            else nativeBridge.haptic("error");
+            const res = await submitGift();
+            if (res.success) {
+                setStep("success");
+            } else if (res.needsTopUp) {
+                // Open the payment popup instead of leaving the user
+                // staring at a "balance not enough" message.
+                setTopUp({
+                    missingAmount: res.needsTopUp.missingAmount,
+                    currency: res.needsTopUp.currency,
+                });
+                nativeBridge.haptic("warning");
+            } else {
+                nativeBridge.haptic("error");
+            }
             return;
         }
 
         const next = ORDER[idx + 1];
         if (next) setStep(next);
+    };
+
+    const onTopUpSuccess = async ({ amount }: { amount: number; balance: number }) => {
+        // Mirror the server-side credit into the local ledger so
+        // selectWalletBalance() now covers the gift, then close the
+        // modal and re-attempt the purchase automatically.
+        recordTopUp({
+            amount,
+            currency: draft.currency,
+            description: "טעינת ארנק",
+        });
+        setTopUp(null);
+        const res = await submitGift();
+        if (res.success) setStep("success");
+        else nativeBridge.haptic("error");
     };
 
     const goBack = () => {
@@ -121,7 +157,13 @@ export function SendGiftWizard() {
                             errors={errors}
                         />
                     )}
-                    {step === "review" && <StepReview key="review" draft={draft} />}
+                    {step === "review" && (
+                        <StepReview
+                            key="review"
+                            draft={draft}
+                            errorMessage={sendError ?? undefined}
+                        />
+                    )}
                     {step === "success" && (
                         <StepSuccess
                             key="success"
@@ -158,6 +200,14 @@ export function SendGiftWizard() {
                     </div>
                 </div>
             )}
+
+            <TopUpModal
+                open={!!topUp}
+                onClose={() => setTopUp(null)}
+                suggestedAmount={topUp?.missingAmount ?? 0}
+                currency={topUp?.currency ?? draft.currency}
+                onSuccess={onTopUpSuccess}
+            />
         </div>
     );
 }

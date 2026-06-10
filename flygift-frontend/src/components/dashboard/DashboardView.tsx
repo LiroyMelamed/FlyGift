@@ -18,8 +18,10 @@ const fadeUp = {
 
 export function DashboardView() {
     const router = useRouter();
-    const { user, activeCards, transactions, totalBalance, activeGiftCount } =
+    const { user, activeCards, transactions, walletBalance, activeGiftCount } =
         useAppDerived();
+
+    const unredeemedGiftTotal = activeCards.reduce((sum, c) => sum + c.amount, 0);
     return (
         <div className="space-y-8 py-6" dir="rtl">
             {/* ========== Hero ========== */}
@@ -30,7 +32,9 @@ export function DashboardView() {
             >
                 <p className="text-sm text-text-secondary">{t.dashboard.welcomeBack}</p>
                 <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-                    <span className="text-gradient-skyline">{user.firstName}</span>
+                    <span className="font-heebo text-cyan-deep dark:text-cyan-glow">
+                        {user.firstName}
+                    </span>
                 </h1>
             </motion.header>
 
@@ -55,16 +59,23 @@ export function DashboardView() {
                         <div className="flex items-start justify-between gap-3 relative z-[1]">
                             <div className="min-w-0 flex-1">
                                 <p className="text-[11px] sm:text-xs uppercase tracking-[0.2em] text-[#475569] dark:text-text-secondary">
-                                    {t.dashboard.totalBalance}
+                                    {t.dashboard.walletBalance}
                                 </p>
                                 <p className="mt-3 font-mono text-[clamp(1.75rem,8vw,3rem)] sm:text-5xl font-semibold tabular-nums text-[#0F172A] dark:text-text-primary break-all leading-tight">
                                     {formatCurrencyDetailed(
-                                        totalBalance,
+                                        walletBalance,
                                         user.currency
                                     )}
                                 </p>
                                 <p className="mt-2 text-sm text-[#475569] dark:text-text-secondary">
-                                    {t.dashboard.across(activeGiftCount)}
+                                    {activeGiftCount > 0
+                                        ? t.dashboard.unredeemedGifts(
+                                            formatCurrencyDetailed(
+                                                unredeemedGiftTotal,
+                                                user.currency
+                                            )
+                                        )
+                                        : t.dashboard.walletReady}
                                 </p>
                             </div>
                             <span
@@ -141,7 +152,7 @@ export function DashboardView() {
                 </div>
                 <GiftCardCarousel
                     cards={activeCards}
-                    onSelect={(c) => router.push(`/gifts/${c.id}`)}
+                    onSelect={(c) => router.push(`/gifts/${encodeURIComponent(c.code)}`)}
                 />
             </motion.section>
 

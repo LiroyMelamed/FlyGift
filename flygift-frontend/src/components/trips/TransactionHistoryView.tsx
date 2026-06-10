@@ -122,30 +122,30 @@ export function TransactionHistoryView() {
     ];
 
     return (
-        <div className="space-y-4" dir="rtl">
+        <div className="min-w-0 space-y-4 overflow-x-hidden" dir="rtl">
             {/* KPI strip */}
-            <div className="grid grid-cols-3 gap-3">
-                <GlassCard padding="md" tone="elevated">
-                    <p className="text-[10px] uppercase tracking-wider text-text-secondary">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <GlassCard padding="sm" tone="elevated" className="min-w-0">
+                    <p className="truncate text-[10px] uppercase tracking-wider text-text-secondary">
                         {i18n.transactions.income}
                     </p>
-                    <p className="mt-1 font-mono text-lg font-semibold text-success tabular-nums">
+                    <p className="mt-1 truncate font-mono text-sm sm:text-lg font-semibold text-success tabular-nums">
                         +{formatCurrencyDetailed(totals.credits, currency)}
                     </p>
                 </GlassCard>
-                <GlassCard padding="md" tone="elevated">
-                    <p className="text-[10px] uppercase tracking-wider text-text-secondary">
+                <GlassCard padding="sm" tone="elevated" className="min-w-0">
+                    <p className="truncate text-[10px] uppercase tracking-wider text-text-secondary">
                         {i18n.transactions.expenses}
                     </p>
-                    <p className="mt-1 font-mono text-lg font-semibold text-warning tabular-nums">
+                    <p className="mt-1 truncate font-mono text-sm sm:text-lg font-semibold text-warning tabular-nums">
                         −{formatCurrencyDetailed(totals.debits, currency)}
                     </p>
                 </GlassCard>
-                <GlassCard padding="md" tone="elevated">
-                    <p className="text-[10px] uppercase tracking-wider text-text-secondary">
+                <GlassCard padding="sm" tone="elevated" className="min-w-0">
+                    <p className="truncate text-[10px] uppercase tracking-wider text-text-secondary">
                         {i18n.transactions.balance}
                     </p>
-                    <p className="mt-1 font-mono text-lg font-semibold text-text-primary tabular-nums">
+                    <p className="mt-1 truncate font-mono text-sm sm:text-lg font-semibold text-text-primary tabular-nums">
                         {formatCurrencyDetailed(totals.net, currency)}
                     </p>
                 </GlassCard>
@@ -153,7 +153,7 @@ export function TransactionHistoryView() {
 
             {/* Category chips */}
             <div
-                className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin"
+                className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 role="tablist"
                 aria-label="Transaction categories"
             >
@@ -234,7 +234,7 @@ function Row({ t, i }: { t: Transaction; i: number }) {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.02 }}
-            className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.02]"
+            className="flex items-center gap-2 px-3 sm:px-4 py-3 hover:bg-white/[0.02]"
         >
             <span
                 className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${TONES[t.type]
@@ -257,7 +257,7 @@ function Row({ t, i }: { t: Transaction; i: number }) {
                     {" · "}#{t.id}
                 </p>
             </div>
-            <div className="shrink-0 text-left" dir="ltr">
+            <div className="shrink-0 text-left">
                 <p
                     className={`whitespace-nowrap font-mono text-sm font-semibold tabular-nums ${sign > 0 ? "text-success" : "text-warning"
                         }`}

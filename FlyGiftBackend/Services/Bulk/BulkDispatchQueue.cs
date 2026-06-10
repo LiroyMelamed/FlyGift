@@ -27,7 +27,7 @@ namespace FlyGiftBackend.Services.Bulk
         public string? Phone { get; set; }
         public string Code { get; set; } = "";
         public decimal Amount { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
     }
 
     public class BulkDispatchQueue : IBulkDispatchQueue

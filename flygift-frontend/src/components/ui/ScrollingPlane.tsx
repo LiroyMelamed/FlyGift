@@ -45,7 +45,10 @@ export function ScrollingPlane() {
                 />
                 <Plane
                     className="h-5 w-5 text-[#0EA5E9] drop-shadow-[0_2px_8px_rgba(14,165,233,0.5)]"
-                    style={{ transform: "rotate(-45deg)" }}
+                    // The lucide plane is drawn with its nose at ~45°
+                    // up-right by default. +45° lands the silhouette
+                    // horizontally pointing right, matching the trail.
+                    style={{ transform: "rotate(45deg)" }}
                 />
             </span>
         </motion.div>

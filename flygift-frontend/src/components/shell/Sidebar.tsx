@@ -11,9 +11,13 @@ import {
     Hotel,
     User2,
     Ticket,
+    BarChart3,
+    Upload,
+    Receipt,
     type LucideIcon,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { useAppDerived } from "@/lib/appStore";
 import { cn } from "@/utils/cn";
 import { t } from "@/i18n/he";
 
@@ -28,12 +32,22 @@ const PRIMARY: NavItem[] = [
 ];
 
 const TRAVEL: NavItem[] = [
+    { href: "/bookings/mine", label: t.nav.myTrips, icon: Plane },
     { href: "/bookings/flights", label: t.nav.flights, icon: Plane },
     { href: "/hotels", label: t.nav.hotels, icon: Hotel },
 ];
 
 const SECONDARY: NavItem[] = [
     { href: "/profile", label: t.nav.profile, icon: User2 },
+];
+
+// Visible only when `user.role === "Company"`. The Insights link points
+// at the analytics dashboard's "insights" tab; Billing points at the
+// same component but in its "billing" section.
+const COMPANY: NavItem[] = [
+    { href: "/company/dashboard", label: t.nav.insights, icon: BarChart3 },
+    { href: "/company/bulk-upload", label: t.nav.bulkUpload, icon: Upload },
+    { href: "/company/dashboard?tab=billing", label: t.nav.billing, icon: Receipt },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -68,8 +82,14 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export function Sidebar({ className }: { className?: string }) {
     const pathname = usePathname() || "/";
-    const isActive = (href: string) =>
-        href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+    const { user } = useAppDerived();
+    const isCompany = user.role === "Company" || user.role === "Admin";
+    const isActive = (href: string) => {
+        // Strip query string when matching so /company/dashboard?tab=…
+        // still highlights when the user is on /company/dashboard.
+        const path = href.split("?")[0];
+        return path === "/dashboard" ? pathname === path : pathname.startsWith(path);
+    };
 
     return (
         <aside
@@ -103,6 +123,24 @@ export function Sidebar({ className }: { className?: string }) {
                         <NavLink key={item.href} item={item} active={isActive(item.href)} />
                     ))}
                 </nav>
+
+                {isCompany && (
+                    <>
+                        <div className="my-4 border-t border-white/5" />
+                        <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gold-champagne/80">
+                            {t.nav.companySection}
+                        </p>
+                        <nav className="space-y-1">
+                            {COMPANY.map((item) => (
+                                <NavLink
+                                    key={item.href}
+                                    item={item}
+                                    active={isActive(item.href)}
+                                />
+                            ))}
+                        </nav>
+                    </>
+                )}
 
                 <div className="my-4 border-t border-white/5" />
                 <nav className="space-y-1">

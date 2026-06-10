@@ -16,8 +16,20 @@ interface Props {
     offer: FlightOffer;
     currentBalance: number;
     isLoading?: boolean;
-    /** Pre-collected passenger details (gathered in the previous step). */
+    /** Primary passenger (first in the manifest) — shown as the contact. */
     passenger: PassengerDetails;
+    /** Total passengers in the booking; rendered next to the primary name. */
+    passengerCount?: number;
+    /**
+     * Set by FlightBookingFlow after the backend rejected the booking
+     * with `insufficient_balance`. Forces the card-input panel open
+     * even when the frontend's optimistic `currentBalance` said the
+     * offer was fully covered (can happen when held gift cards are
+     * counted toward balance but aren't yet redeemed in the ledger).
+     */
+    forcePayment?: boolean;
+    /** Authoritative remainder reported by the backend on a 400. */
+    forcedMissingAmount?: number;
     onConfirm: (input: { passengerName: string; paymentMethodToken?: string }) => void;
     onEditPassenger: () => void;
     onBack: () => void;
@@ -34,13 +46,23 @@ export function CheckoutSummary({
     currentBalance,
     isLoading,
     passenger,
+    passengerCount = 1,
+    forcePayment,
+    forcedMissingAmount,
     onConfirm,
     onEditPassenger,
     onBack,
 }: Props) {
-    const fromBalance = Math.min(currentBalance, offer.price.total);
-    const fromCard = +(offer.price.total - fromBalance).toFixed(2);
-    const needsCard = fromCard > 0;
+    const optimisticFromBalance = Math.min(currentBalance, offer.price.total);
+    const optimisticFromCard = +(offer.price.total - optimisticFromBalance).toFixed(2);
+
+    // When the backend has told us card payment is required, trust its
+    // missingAmount over the frontend's optimistic split.
+    const fromCard = forcePayment
+        ? +(forcedMissingAmount ?? optimisticFromCard).toFixed(2)
+        : optimisticFromCard;
+    const fromBalance = +(offer.price.total - fromCard).toFixed(2);
+    const needsCard = forcePayment || fromCard > 0;
 
     const passengerName = `${passenger.firstName} ${passenger.lastName}`.trim();
 
@@ -64,7 +86,7 @@ export function CheckoutSummary({
     };
 
     return (
-        <div className="mx-auto max-w-2xl space-y-5 py-6" dir="rtl">
+        <div className="mx-auto max-w-2xl space-y-5 py-6 pb-32" dir="rtl">
             <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -163,6 +185,11 @@ export function CheckoutSummary({
                     <div>
                         <p className="text-[10px] uppercase tracking-wider text-text-secondary">
                             {t.flights.passengerLabel}
+                            {passengerCount > 1 && (
+                                <span className="ms-2 text-[10px] text-cyan-jet">
+                                    +{passengerCount - 1} נוסעים נוספים
+                                </span>
+                            )}
                         </p>
                         <p className="font-mono tabular-nums" dir="ltr">
                             {passengerName}
@@ -223,6 +250,11 @@ export function CheckoutSummary({
                                     {formatCurrencyDetailed(fromCard, offer.price.currency)}
                                 </span>
                             </div>
+                            {forcePayment && (
+                                <p className="text-xs text-gold-champagne">
+                                    {t.flights.paymentMethodRequired}
+                                </p>
+                            )}
                             <TextField
                                 label={t.flights.cardNumber}
                                 value={cardNumber}

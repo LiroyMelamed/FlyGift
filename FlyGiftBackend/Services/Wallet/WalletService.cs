@@ -4,7 +4,6 @@ using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using QRCoder;
 
 namespace FlyGiftBackend.Services.Wallet
 {
@@ -36,16 +35,39 @@ namespace FlyGiftBackend.Services.Wallet
         string BuildGoogleWalletSaveLink(int bookingId, BoardingPassData data);
     }
 
+    /// <summary>
+    /// Thrown when a wallet pass cannot be produced because signing
+    /// certificates aren't configured. The booking controller catches
+    /// this and returns a 503 with a Hebrew message instead of letting
+    /// the exception bubble or, worse, emitting an unsigned bundle in
+    /// production.
+    /// </summary>
+    public sealed class WalletNotConfiguredException : InvalidOperationException
+    {
+        public WalletNotConfiguredException(string message) : base(message) { }
+    }
+
     public class WalletService : IWalletService
     {
         private readonly IConfiguration _cfg;
+        private readonly IHostEnvironment _env;
         private readonly ILogger<WalletService> _log;
 
-        public WalletService(IConfiguration cfg, ILogger<WalletService> log)
+        public WalletService(IConfiguration cfg, IHostEnvironment env, ILogger<WalletService> log)
         {
             _cfg = cfg;
+            _env = env;
             _log = log;
         }
+
+        /// <summary>
+        /// Only local dev (or an explicit opt-in) may emit unsigned Apple
+        /// passes. Demo payment mode does NOT qualify — unsigned .pkpass
+        /// files are rejected by iOS Safari with "cannot download this file".
+        /// </summary>
+        private bool AllowWalletStub =>
+            _env.IsDevelopment()
+            || string.Equals(_cfg["Wallet:AllowUnsigned"], "true", StringComparison.OrdinalIgnoreCase);
 
         // ---------- APPLE WALLET ----------
 
@@ -57,18 +79,17 @@ namespace FlyGiftBackend.Services.Wallet
             var orgName    = _cfg["Wallet:Apple:OrganizationName"]   ?? "FlyGift";
 
             var passJson = BuildPassJson(bookingId, data, passTypeId, teamId, orgName);
-            var qrPng    = GenerateQrPng(string.IsNullOrWhiteSpace(data.BarcodePayload)
-                              ? data.BookingReference
-                              : data.BarcodePayload);
+            var icon     = WalletPassAssets.Icon29;
+            var icon2x   = WalletPassAssets.Icon58;
+            var logo     = WalletPassAssets.Logo160x50;
 
             // Files that go into the .pkpass zip
             var files = new Dictionary<string, byte[]>
             {
-                ["pass.json"] = Encoding.UTF8.GetBytes(passJson),
-                ["icon.png"]  = qrPng,        // placeholder; replace with real branded icons in prod
-                ["icon@2x.png"] = qrPng,
-                ["logo.png"]    = qrPng,
-                ["thumbnail.png"] = qrPng,
+                ["pass.json"]   = Encoding.UTF8.GetBytes(passJson),
+                ["icon.png"]    = icon,
+                ["icon@2x.png"] = icon2x,
+                ["logo.png"]    = logo,
             };
 
             // manifest.json = SHA1 of every file
@@ -78,10 +99,29 @@ namespace FlyGiftBackend.Services.Wallet
             var manifestJson = JsonSerializer.Serialize(manifest);
             files["manifest.json"] = Encoding.UTF8.GetBytes(manifestJson);
 
-            // Sign manifest -> signature (PKCS#7 detached, DER-encoded)
+            // Sign manifest -> signature (PKCS#7 detached, DER-encoded).
+            // In Production we refuse to emit an unsigned bundle — Apple
+            // Wallet rejects unsigned passes anyway, and surfacing the
+            // failure clearly is better than handing the user a bundle
+            // their phone will reject silently.
             var signature = TrySignManifest(files["manifest.json"]);
-            if (signature != null) files["signature"] = signature;
-            else _log.LogWarning("[Wallet] Apple signing certs missing — emitting UNSIGNED .pkpass (dev only).");
+            if (signature != null)
+            {
+                files["signature"] = signature;
+            }
+            else if (AllowWalletStub)
+            {
+                _log.LogWarning("[Wallet] Apple signing certs missing — emitting UNSIGNED .pkpass (demo/dev).");
+            }
+            else
+            {
+                _log.LogError(
+                    "[Wallet] Apple signing certs missing in {Env}. " +
+                    "Set Wallet:Apple:CertPath / CertPassword / WwdrCertPath. Refusing to emit unsigned .pkpass.",
+                    _env.EnvironmentName);
+                throw new WalletNotConfiguredException(
+                    "Apple Wallet signing isn't configured. Upload Pass Type ID certificate to the server.");
+            }
 
             using var ms = new MemoryStream();
             using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
@@ -196,19 +236,27 @@ namespace FlyGiftBackend.Services.Wallet
             }
         }
 
-        private static byte[] GenerateQrPng(string payload)
-        {
-            using var qrGen = new QRCodeGenerator();
-            using var qrData = qrGen.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
-            var pngQr = new PngByteQRCode(qrData);
-            return pngQr.GetGraphic(8);
-        }
-
         // ---------- GOOGLE WALLET ----------
 
         public string BuildGoogleWalletSaveLink(int bookingId, BoardingPassData data)
         {
-            var issuerId = _cfg["Wallet:Google:IssuerId"] ?? "3388000000022000000";
+            var issuerId = _cfg["Wallet:Google:IssuerId"];
+            var serviceEmail = _cfg["Wallet:Google:ServiceAccountEmail"];
+
+            // In Prod we refuse to hand out a stub link that won't
+            // actually save to Google Wallet. Dev keeps the deep-link
+            // fallback so the frontend integration stays exercisable.
+            if (!AllowWalletStub &&
+                (string.IsNullOrWhiteSpace(issuerId) || string.IsNullOrWhiteSpace(serviceEmail)))
+            {
+                _log.LogError(
+                    "[Wallet] Google Wallet not configured in {Env} (need Wallet:Google:IssuerId + ServiceAccountEmail).",
+                    _env.EnvironmentName);
+                throw new WalletNotConfiguredException(
+                    "Google Wallet isn't configured on the server.");
+            }
+
+            issuerId ??= "3388000000022000000";
             var classId  = _cfg["Wallet:Google:ClassId"]  ?? $"{issuerId}.flygift_boardingpass";
             var objectId = $"{issuerId}.flygift_{bookingId}";
 
@@ -225,7 +273,7 @@ namespace FlyGiftBackend.Services.Wallet
                 iss   = _cfg["Wallet:Google:ServiceAccountEmail"] ?? "stub@flygift.iam.gserviceaccount.com",
                 aud   = "google",
                 typ   = "savetowallet",
-                origins = new[] { _cfg["Wallet:Google:Origin"] ?? "https://app.flygift.com" },
+                origins = new[] { _cfg["Wallet:Google:Origin"] ?? "https://flygift.mela-media.co.il" },
                 payload = new
                 {
                     flightObjects = new[]

@@ -30,7 +30,7 @@ namespace FlyGiftBackend.Services.Ledger
         public int UserId { get; set; }
         public TransactionType Type { get; set; }
         public decimal Amount { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
         public int? RelatedGiftCardId { get; set; }
         public string? Reference { get; set; }
         public string? Description { get; set; }
@@ -51,27 +51,18 @@ namespace FlyGiftBackend.Services.Ledger
 
         public async Task<decimal> GetBalanceAsync(int userId, CancellationToken ct = default)
         {
-            // Sum positives (Load/Refund) and subtract negatives (Spend/Adjustment-).
-            // We keep `Amount` non-negative everywhere; sign is implied by Type.
-            var rows = await _db.Transactions
+            var cached = await _db.Users
                 .AsNoTracking()
-                .Where(t => t.UserId == userId)
-                .Select(t => new { t.Type, t.Amount, t.IsReversal })
-                .ToListAsync(ct);
+                .Where(u => u.Id == userId)
+                .Select(u => (decimal?)u.AccountBalance)
+                .FirstOrDefaultAsync(ct);
 
-            decimal balance = 0m;
-            foreach (var r in rows)
-            {
-                var sign = SignFor(r.Type);
-                if (r.IsReversal) sign = -sign;
-                balance += sign * r.Amount;
-            }
-            return balance;
+            return cached ?? 0m;
         }
 
         public async Task<bool> VerifyConsistencyAsync(int userId, CancellationToken ct = default)
         {
-            var ledger = await GetBalanceAsync(userId, ct);
+            var ledger = await SumLedgerAsync(userId, ct);
             var cached = await _db.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
@@ -88,15 +79,35 @@ namespace FlyGiftBackend.Services.Ledger
             return true;
         }
 
+        private async Task<decimal> SumLedgerAsync(int userId, CancellationToken ct)
+        {
+            var rows = await _db.Transactions
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .Select(t => new { t.Type, t.Amount, t.IsReversal })
+                .ToListAsync(ct);
+
+            decimal balance = 0m;
+            foreach (var r in rows)
+            {
+                var sign = SignFor(r.Type);
+                if (r.IsReversal) sign = -sign;
+                balance += sign * r.Amount;
+            }
+            return balance;
+        }
+
         public async Task<Transaction> PostAsync(LedgerEntry entry, CancellationToken ct = default)
         {
             if (entry.Amount < 0)
                 throw new InvalidOperationException("LedgerEntry.Amount must be non-negative; sign is derived from Type.");
 
-            var current = await GetBalanceAsync(entry.UserId, ct);
+            var user = await _db.Users.FirstAsync(u => u.Id == entry.UserId, ct);
+            var current = user.AccountBalance;
             var sign = SignFor(entry.Type);
             if (entry.IsReversal) sign = -sign;
             var after = current + sign * entry.Amount;
+            user.AccountBalance = after;
 
             var row = new Transaction
             {

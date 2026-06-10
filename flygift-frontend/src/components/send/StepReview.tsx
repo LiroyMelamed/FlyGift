@@ -1,14 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { AlertCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { GiftCard3D } from "@/components/giftcard/GiftCard3D";
+import { LuxuryGiftCard } from "@/components/giftcard/LuxuryGiftCard";
 import { formatCurrencyDetailed, formatExpiration } from "@/utils/format";
 import type { MockGiftCard } from "@/lib/mockData";
 import type { GiftDraft } from "./types";
 
 interface Props {
     draft: GiftDraft;
+    errorMessage?: string;
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
@@ -24,7 +26,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-export function StepReview({ draft }: Props) {
+export function StepReview({ draft, errorMessage }: Props) {
     const previewCard: MockGiftCard = {
         id: "preview",
         code: "FG-•••• ••••",
@@ -54,8 +56,12 @@ export function StepReview({ draft }: Props) {
                 </p>
             </header>
 
-            <div className="flex justify-center">
-                <GiftCard3D card={previewCard} className="w-full max-w-sm" />
+            <div className="flex justify-center overflow-hidden px-2">
+                <LuxuryGiftCard
+                    card={previewCard}
+                    interactive={false}
+                    className="w-full max-w-[18rem] sm:max-w-sm"
+                />
             </div>
 
             <GlassCard padding="md" className="divide-y divide-[#0F172A]/10">
@@ -86,6 +92,18 @@ export function StepReview({ draft }: Props) {
             <p className="text-center text-xs text-[#0F172A]/60">
                 באישור אתם מאשרים את תנאי השימוש של FlyGift.
             </p>
+
+            {errorMessage && (
+                <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    role="alert"
+                    className="flex items-start gap-2 rounded-2xl border border-danger/40 bg-danger/10 p-3 text-right text-sm text-danger"
+                >
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-none" />
+                    <span className="flex-1">{errorMessage}</span>
+                </motion.div>
+            )}
         </motion.div>
     );
 }

@@ -17,6 +17,11 @@ namespace FlyGiftBackend.Services.Flights
         public CabinClass Cabin { get; set; } = CabinClass.Economy;
     }
 
+    // Frontend sends string values ("Economy", "Business", …); the
+    // default enum binder only accepts integers, which produces a
+    // confusing 400 ("could not be converted to CabinClass"). The
+    // converter accepts both names *and* numbers, case-insensitively.
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum CabinClass { Economy, PremiumEconomy, Business, First }
 
     public class FlightSearchResponse
@@ -39,6 +44,14 @@ namespace FlyGiftBackend.Services.Flights
         public bool IsBestPrice { get; set; }
         public string? BestPriceReason { get; set; } // e.g. "12% below market"
         public DateTime ExpiresAt { get; set; }
+        /// <summary>
+        /// Provider-side handoff token (Kiwi Tequila <c>booking_token</c>,
+        /// Duffel offer id, …). Required by Tequila's Booking API for the
+        /// check_flights / save_booking / confirm_payment chain. Server-only —
+        /// never leaks to the frontend (filtered by the controller mapper).
+        /// </summary>
+        [JsonIgnore]
+        public string? ProviderToken { get; set; }
     }
 
     public class CarrierInfo
@@ -83,7 +96,7 @@ namespace FlyGiftBackend.Services.Flights
         public decimal Total { get; set; }
         public decimal Base { get; set; }
         public decimal Taxes { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
         /// <summary>Median across competitor providers (mock for now).</summary>
         public decimal MarketMedian { get; set; }
     }

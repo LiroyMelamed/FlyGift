@@ -3,23 +3,58 @@ import {
     redeemCard,
     recordSpend,
     resetAppStore,
+    setCards,
     selectActiveCards,
     selectTotalBalance,
     selectWalletBalance,
     selectCardById,
 } from "@/lib/appStore";
-import { MOCK_GIFT_CARDS } from "@/lib/mockData";
+import type { MockGiftCard } from "@/lib/mockData";
+
+// Cards now live in the backend; tests install a deterministic fixture
+// via `setCards` rather than rely on a deleted in-memory mock array.
+const FIXTURE_CARDS: MockGiftCard[] = [
+    {
+        id: "1",
+        code: "FG-TEST-0001",
+        amount: 500,
+        currency: "ILS",
+        status: "Active",
+        variant: "cyan-jet",
+        category: "Flights",
+        senderName: "Test Sender",
+        recipientName: "Test Recipient",
+        expirationDate: "2027-12-31T00:00:00Z",
+        createdAt: "2026-01-01T00:00:00Z",
+    },
+    {
+        id: "2",
+        code: "FG-TEST-0002",
+        amount: 250,
+        currency: "ILS",
+        status: "Active",
+        variant: "gold-champagne",
+        category: "Hotels",
+        senderName: "Test Sender 2",
+        recipientName: "Test Recipient",
+        expirationDate: "2027-12-31T00:00:00Z",
+        createdAt: "2026-01-02T00:00:00Z",
+    },
+];
 
 describe("appStore", () => {
-    beforeEach(() => resetAppStore());
+    beforeEach(() => {
+        resetAppStore();
+        setCards(FIXTURE_CARDS.map((c) => ({ ...c })));
+    });
 
-    it("seeds with all mock cards Active", () => {
+    it("seeds with all fixture cards Active", () => {
         const active = selectActiveCards();
-        expect(active).toHaveLength(MOCK_GIFT_CARDS.length);
+        expect(active).toHaveLength(FIXTURE_CARDS.length);
     });
 
     it("totalBalance = wallet + sum of active cards", () => {
-        const cardsTotal = MOCK_GIFT_CARDS.reduce((s, c) => s + c.amount, 0);
+        const cardsTotal = FIXTURE_CARDS.reduce((s, c) => s + c.amount, 0);
         const total = selectTotalBalance();
         const wallet = selectWalletBalance();
         expect(total).toBeCloseTo(wallet + cardsTotal, 2);
@@ -27,8 +62,8 @@ describe("appStore", () => {
 
     it("redeemCard moves the value from card to wallet", () => {
         const before = selectTotalBalance();
-        const targetId = MOCK_GIFT_CARDS[0].id;
-        const cardAmount = MOCK_GIFT_CARDS[0].amount;
+        const targetId = FIXTURE_CARDS[0].id;
+        const cardAmount = FIXTURE_CARDS[0].amount;
         const walletBefore = selectWalletBalance();
 
         const res = redeemCard(targetId);
@@ -37,7 +72,7 @@ describe("appStore", () => {
         // Card flipped
         expect(selectCardById(targetId)?.status).toBe("Redeemed");
         // Active count down by one
-        expect(selectActiveCards()).toHaveLength(MOCK_GIFT_CARDS.length - 1);
+        expect(selectActiveCards()).toHaveLength(FIXTURE_CARDS.length - 1);
         // Wallet credited by exactly the card's amount
         expect(selectWalletBalance()).toBeCloseTo(walletBefore + cardAmount, 2);
         // Total balance is preserved (card → wallet, no value created)
@@ -45,7 +80,7 @@ describe("appStore", () => {
     });
 
     it("redeemCard is idempotent for non-active cards", () => {
-        const id = MOCK_GIFT_CARDS[0].id;
+        const id = FIXTURE_CARDS[0].id;
         const first = redeemCard(id);
         const second = redeemCard(id);
         expect(first.ok).toBe(true);
@@ -70,7 +105,6 @@ describe("appStore", () => {
     });
 
     it("dashboard balance == ledger total when seeded", () => {
-        // The two KPIs that drift in production must agree.
         const dashboard = selectTotalBalance();
         const wallet = selectWalletBalance();
         const cardsHeld = selectActiveCards().reduce((s, c) => s + c.amount, 0);

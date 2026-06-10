@@ -20,18 +20,25 @@ const config: Config = {
                     800: "#070C1C",
                     900: "#050814",
                     950: "#02040C",
+                    blue: "#0D1B2A",  // Brand primary navy
                 },
+                // Stage 24 — Brand palette. Turquoise replaces electric cyan
+                // as the primary accent; classes named `cyan-*` are kept so
+                // existing markup compiles without a search-and-replace.
                 cyan: {
-                    jet: "#00E5FF",
-                    glow: "#5BF0FF",
-                    deep: "#0066FF",
+                    jet: "#00C2CB",   // Brand turquoise (secondary accent)
+                    glow: "#33D7DE",  // Lightened turquoise for hover/glow
+                    deep: "#0E7E84",  // Deep teal
                 },
-                // Stage 23 — Executive Navy aliases. We KEEP the `gold` token name
-                // so existing `text-gold-champagne`, `bg-gold-champagne/15` etc.
-                // continue to compile, but they now render Navy.
+                // Stage 24 — Restored to actual luxury gold. The Stage 23
+                // alias that overloaded these to Navy is gone; navy now
+                // lives under `midnight.blue`.
                 gold: {
-                    champagne: "#0F172A",
-                    deep: "#1E3A8A",
+                    champagne: "#F2C55C", // Brand luxury gold
+                    deep: "#B8932F",      // Deeper gold for hover/borders
+                },
+                surface: {
+                    light: "#F1F3F5", // Brand neutral background
                 },
                 violet: {
                     aurora: "#7C5CFF",

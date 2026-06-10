@@ -5,9 +5,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, Plane } from "lucide-react";
 import { GhostButton } from "@/components/ui/Buttons";
 import { useFlightSearch } from "@/hooks/useFlightSearch";
-import { useBookFlight } from "@/hooks/useBookFlight";
+import { useBookFlight, InsufficientBalanceError, PriceChangedError } from "@/hooks/useBookFlight";
 import { nativeBridge } from "@/utils/nativeBridge";
-import { useAppDerived, recordSpend } from "@/lib/appStore";
+import { useAppDerived } from "@/lib/appStore";
+import { refreshTransactions } from "@/lib/refreshTransactions";
 import { FlightSearchForm } from "./FlightSearchForm";
 import { FlightResultsList } from "./FlightResultsList";
 import { CheckoutSummary } from "./CheckoutSummary";
@@ -19,7 +20,8 @@ import {
     type FlightFilterState,
 } from "./FlightFilters";
 import { PassengerDetailsStep, type PassengerDetails } from "./PassengerDetailsStep";
-import { mockFlightApi } from "@/lib/mockFlights";
+import { flightApi } from "@/lib/flightApi";
+import { formatCurrencyDetailed } from "@/utils/format";
 import { t } from "@/i18n/he";
 import type { FlightOffer, FlightSearchRequest } from "@/lib/flightTypes";
 
@@ -76,7 +78,15 @@ export function FlightBookingFlow() {
     const [step, setStep] = useState<Step>("search");
     const [selected, setSelected] = useState<FlightOffer | null>(null);
     const [bookError, setBookError] = useState<string | null>(null);
-    const { totalBalance, user } = useAppDerived();
+    // Set when the backend told us the wallet doesn't cover the offer and
+    // a payment-method token is required. Forces CheckoutSummary to show
+    // the card-input panel even if the frontend's optimistic balance said
+    // it was fully covered.
+    const [paymentRequired, setPaymentRequired] = useState<{
+        missingAmount: number;
+        currency: string;
+    } | null>(null);
+    const { walletBalance, user } = useAppDerived();
 
     // Outbound search (first leg, or only leg for one-way)
     const {
@@ -100,8 +110,10 @@ export function FlightBookingFlow() {
         null
     );
 
-    // Passenger details collected before checkout
-    const [passenger, setPassenger] = useState<PassengerDetails | null>(null);
+    // Passenger details collected before checkout. One entry per
+    // passenger picked at search time — sent as the multi-passenger
+    // manifest to /api/Bookings/BookFlight.
+    const [passengers, setPassengers] = useState<PassengerDetails[] | null>(null);
 
     const { book, isLoading: isBooking, result, reset } = useBookFlight();
 
@@ -115,7 +127,7 @@ export function FlightBookingFlow() {
         setActiveLeg("outbound");
         setOutboundFilters(null);
         setReturnFilters(null);
-        setPassenger(null);
+        setPassengers(null);
         const res = await searchOutbound(req);
         if (res?.offers) setOutboundFilters(buildInitialFilters(res.offers));
         setStep("results");
@@ -136,7 +148,7 @@ export function FlightBookingFlow() {
         setIsSearchingReturn(true);
         setActiveLeg("return");
         try {
-            const res = await mockFlightApi.search({
+            const res = await flightApi.search({
                 origin: lastRequest.destination,
                 destination: lastRequest.origin,
                 departureDate: lastRequest.returnDate!,
@@ -173,9 +185,12 @@ export function FlightBookingFlow() {
     const goConfirm = async (input: {
         passengerName: string;
         paymentMethodToken?: string;
-    }) => {
+    }, acceptedPrice?: number) => {
         if (!selected) return;
         setBookError(null);
+        setPaymentRequired(null);
+        const offerTotal = acceptedPrice ?? selected.price.total;
+        const offerCurrency = selected.price.currency;
         try {
             const isRT = selected.slices.length > 1;
             const firstSlice = selected.slices[0];
@@ -184,34 +199,72 @@ export function FlightBookingFlow() {
                 ? `${firstSlice.origin.iata} ⇄ ${firstSlice.destination.iata}`
                 : `${firstSlice.origin.iata} → ${firstSlice.destination.iata}`;
             const flightNumber = firstSlice.segments[0].flightNumber;
+            const manifest = passengers && passengers.length > 0
+                ? passengers.map((p) => ({
+                    firstName: p.firstName,
+                    lastName: p.lastName,
+                    passportNumber: p.passportNumber,
+                    passportExpiry: p.passportExpiry,
+                    birthDate: p.birthDate,
+                }))
+                : undefined;
             await book(
                 {
                     offerId: selected.id,
+                    passengers: manifest,
                     passengerName: input.passengerName,
                     paymentMethodToken: input.paymentMethodToken,
+                    acceptedPrice,
                 },
                 {
-                    offerTotal: selected.price.total,
-                    currency: selected.price.currency,
-                    currentBalance: totalBalance,
+                    offerTotal,
+                    currency: offerCurrency,
+                    currentBalance: walletBalance,
                     route,
                     flightNumber,
                     departureUtc: firstSlice.departureUtc,
                 }
             );
-            // Persist the spend so the wallet balance and ledger update.
-            const description = isRT
-                ? `טיסה הלוך וחזור (${firstSlice.origin.iata}⇄${firstSlice.destination.iata}) · ${flightNumber} + ${lastSlice.segments[0].flightNumber}`
-                : `טיסה ${flightNumber} (${firstSlice.origin.iata}→${firstSlice.destination.iata})`;
-            recordSpend({
-                amount: selected.price.total,
-                currency: selected.price.currency || user.currency,
-                description,
-                reference: `booking:flight-${selected.id}`,
-            });
+            await refreshTransactions();
             setStep("issued");
         } catch (e) {
             nativeBridge.haptic("error");
+            if (e instanceof PriceChangedError) {
+                const displayCurrency = selected.price.currency;
+                if (e.currency === displayCurrency) {
+                    setSelected((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  price: {
+                                      ...prev.price,
+                                      total: e.newPrice,
+                                      base: e.newPrice,
+                                  },
+                              }
+                            : null
+                    );
+                }
+                if (acceptedPrice === undefined) {
+                    setBookError(
+                        e.currency === displayCurrency
+                            ? `המחיר עודכן ל-${formatCurrencyDetailed(e.newPrice, e.currency)}. מאשרים מחדש…`
+                            : e.message || "המחיר עודכן אצל הספק. מאשרים מחדש…"
+                    );
+                    await goConfirm(input, e.newPrice);
+                } else {
+                    setBookError(e.message);
+                }
+                return;
+            }
+            if (e instanceof InsufficientBalanceError) {
+                setPaymentRequired({
+                    missingAmount: e.missingAmount,
+                    currency: e.currency,
+                });
+                setBookError(e.message);
+                return;
+            }
             setBookError(e instanceof Error ? e.message : t.common.bookingFailed);
         }
     };
@@ -359,12 +412,13 @@ export function FlightBookingFlow() {
                         exit={{ opacity: 0, y: -8 }}
                     >
                         <PassengerDetailsStep
-                            initial={passenger ?? undefined}
+                            initial={passengers ?? undefined}
+                            count={lastRequest.passengers ?? 1}
                             departureDate={
                                 selected.slices[0].departureUtc.slice(0, 10)
                             }
                             onSubmit={(d) => {
-                                setPassenger(d);
+                                setPassengers(d);
                                 setStep("checkout");
                             }}
                             onBack={() => {
@@ -374,7 +428,7 @@ export function FlightBookingFlow() {
                     </motion.div>
                 )}
 
-                {step === "checkout" && selected && passenger && (
+                {step === "checkout" && selected && passengers && passengers.length > 0 && (
                     <motion.div
                         key="checkout"
                         initial={{ opacity: 0, y: 8 }}
@@ -389,9 +443,12 @@ export function FlightBookingFlow() {
                         )}
                         <CheckoutSummary
                             offer={selected}
-                            currentBalance={totalBalance}
+                            currentBalance={walletBalance}
                             isLoading={isBooking}
-                            passenger={passenger}
+                            passenger={passengers[0]}
+                            passengerCount={passengers.length}
+                            forcePayment={!!paymentRequired}
+                            forcedMissingAmount={paymentRequired?.missingAmount}
                             onConfirm={goConfirm}
                             onEditPassenger={() => setStep("passenger")}
                             onBack={() => {

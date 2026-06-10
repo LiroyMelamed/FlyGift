@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "dndRYDV+JWE=",
+  "dgSpecHash": "iqKBPTf2W8c=",
   "success": true,
   "projectFilePath": "/Users/liroymelamed/Projects/FlyGift/FlyGiftBackend/FlyGiftBackend.csproj",
   "expectedPackageFiles": [
@@ -70,7 +70,10 @@
     "/Users/liroymelamed/.nuget/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
     "/Users/liroymelamed/.nuget/packages/system.security.cryptography.pkcs/9.0.0/system.security.cryptography.pkcs.9.0.0.nupkg.sha512",
     "/Users/liroymelamed/.nuget/packages/system.text.json/9.0.2/system.text.json.9.0.2.nupkg.sha512",
-    "/Users/liroymelamed/.nuget/packages/system.threading.channels/7.0.0/system.threading.channels.7.0.0.nupkg.sha512"
+    "/Users/liroymelamed/.nuget/packages/system.threading.channels/7.0.0/system.threading.channels.7.0.0.nupkg.sha512",
+    "/Users/liroymelamed/.nuget/packages/microsoft.netcore.app.runtime.linux-x64/9.0.15/microsoft.netcore.app.runtime.linux-x64.9.0.15.nupkg.sha512",
+    "/Users/liroymelamed/.nuget/packages/microsoft.aspnetcore.app.runtime.linux-x64/9.0.15/microsoft.aspnetcore.app.runtime.linux-x64.9.0.15.nupkg.sha512",
+    "/Users/liroymelamed/.nuget/packages/microsoft.netcore.app.host.linux-x64/9.0.15/microsoft.netcore.app.host.linux-x64.9.0.15.nupkg.sha512"
   ],
   "logs": []
 }

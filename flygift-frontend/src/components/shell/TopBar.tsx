@@ -30,7 +30,7 @@ export function TopBar({
     const router = useRouter();
     const [searchOpen, setSearchOpen] = useState(false);
     const { isDark, toggleTheme } = useTheme();
-    const { totalBalance, user } = useAppDerived();
+    const { walletBalance, user } = useAppDerived();
 
     const handleBack = () => {
         nativeBridge.haptic("light");
@@ -61,6 +61,7 @@ export function TopBar({
             <GlassCard
                 tone="elevated"
                 padding="none"
+                allowOverflow
                 className="flex h-14 items-center justify-between rounded-2xl px-4"
             >
                 <div className="flex items-center gap-3">
@@ -90,19 +91,24 @@ export function TopBar({
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                    {/* Live wallet badge — single source of truth from appStore */}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            nativeBridge.haptic("light");
-                            router.push("/transactions");
-                        }}
-                        aria-label={t.dashboard.totalBalance}
-                        className="ring-focus hidden sm:inline-flex items-center gap-1.5 rounded-full border border-cyan-jet/30 bg-cyan-jet/10 px-3 h-9 text-xs font-mono tabular-nums text-cyan-glow hover:bg-cyan-jet/15 transition-colors"
-                    >
-                        <Wallet className="h-3.5 w-3.5" />
-                        <span dir="ltr">{formatCurrencyDetailed(totalBalance, user.currency)}</span>
-                    </button>
+                    {/* Live wallet badge — only meaningful for Client users.
+                        Company/Admin accounts distribute gifts rather than
+                        hold a redeemable balance, so the pill is hidden for
+                        them; their relevant numbers live in the Billing tab. */}
+                    {user.role !== "Company" && user.role !== "Admin" && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                nativeBridge.haptic("light");
+                                router.push("/transactions");
+                            }}
+                            aria-label={t.dashboard.walletBalance}
+                            className="ring-focus hidden sm:inline-flex items-center gap-1.5 rounded-full border border-cyan-jet/30 bg-cyan-jet/10 px-3 h-9 text-xs font-mono tabular-nums text-cyan-glow hover:bg-cyan-jet/15 transition-colors"
+                        >
+                            <Wallet className="h-3.5 w-3.5" />
+                            <span dir="ltr">{formatCurrencyDetailed(walletBalance, user.currency)}</span>
+                        </button>
+                    )}
                     {/* Desktop: search trigger with ⌘K hint */}
                     <button
                         type="button"

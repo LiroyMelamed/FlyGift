@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, Users } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PrimaryButton } from "@/components/ui/Buttons";
-import { TextField } from "@/components/ui/FormFields";
+import { TextField, DateField } from "@/components/ui/FormFields";
 import { AirportAutocomplete } from "./AirportAutocomplete";
 import { t } from "@/i18n/he";
 import type { CabinClass, FlightSearchRequest } from "@/lib/flightTypes";
@@ -121,45 +121,23 @@ export function FlightSearchForm({ initial, isLoading, onSearch }: Props) {
                 />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="space-y-1.5 sm:col-span-1">
-                    <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary text-start">
-                        {t.flights.depart}
-                    </label>
-                    <div className="relative">
-                        <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#475569] dark:text-text-secondary" />
-                        <input
-                            type="date"
-                            value={departureDate}
-                            min={todayPlus(0)}
-                            onChange={(e) => setDepartureDate(e.target.value)}
-                            className="w-full rounded-xl border border-[#0F172A]/20 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] pr-10 pl-3 py-3 text-base text-[#0F172A] dark:text-text-primary focus:outline-none focus:border-cyan-jet/60 focus:bg-white/90 dark:focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(0,229,255,0.12)]"
-                        />
-                    </div>
-                    {errors.departureDate && (
-                        <p className="text-xs text-danger">{errors.departureDate}</p>
-                    )}
-                </div>
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <DateField
+                    label={t.flights.depart}
+                    value={departureDate}
+                    min={todayPlus(0)}
+                    onChange={setDepartureDate}
+                    error={errors.departureDate}
+                />
 
                 {tripType === "roundTrip" && (
-                    <div className="space-y-1.5 sm:col-span-1">
-                        <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary text-start">
-                            {t.flights.returnDate}
-                        </label>
-                        <div className="relative">
-                            <Calendar className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#475569] dark:text-text-secondary" />
-                            <input
-                                type="date"
-                                value={returnDate}
-                                min={departureDate}
-                                onChange={(e) => setReturnDate(e.target.value)}
-                                className="w-full rounded-xl border border-[#0F172A]/20 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] pr-10 pl-3 py-3 text-base text-[#0F172A] dark:text-text-primary focus:outline-none focus:border-cyan-jet/60 focus:bg-white/90 dark:focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(0,229,255,0.12)]"
-                            />
-                        </div>
-                        {errors.returnDate && (
-                            <p className="text-xs text-danger">{errors.returnDate}</p>
-                        )}
-                    </div>
+                    <DateField
+                        label={t.flights.returnDate}
+                        value={returnDate}
+                        min={departureDate}
+                        onChange={setReturnDate}
+                        error={errors.returnDate}
+                    />
                 )}
 
                 <TextField
@@ -171,7 +149,7 @@ export function FlightSearchForm({ initial, isLoading, onSearch }: Props) {
                     onChange={(e) => setPassengers(Math.max(1, +e.target.value || 1))}
                 />
 
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5 sm:col-span-2 lg:col-span-1">
                     <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary text-start">
                         {t.flights.cabin}
                     </label>

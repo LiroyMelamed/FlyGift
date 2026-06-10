@@ -17,20 +17,20 @@ interface Props {
 }
 
 export function RedeemModal({ open, card, onClose, onRedeemed }: Props) {
-    const { redeem, isLoading, result } = useRedeemGift();
+    const { redeem, reset, isLoading, error, result } = useRedeemGift();
 
-    // Trap escape key
+    // Trap escape key + reset stale state when reopened
     useEffect(() => {
         if (!open) return;
+        reset();
         const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [open, onClose]);
+    }, [open, onClose, reset]);
 
     const handleRedeem = async () => {
-        const res = await redeem(card.id);
+        const res = await redeem(card.id, card.code, card.senderName);
         if (res.success) {
-            // Long success haptic pattern
             nativeBridge.haptic("success");
             window.setTimeout(() => nativeBridge.haptic("heavy"), 120);
             window.setTimeout(() => nativeBridge.haptic("medium"), 280);
@@ -39,6 +39,8 @@ export function RedeemModal({ open, card, onClose, onRedeemed }: Props) {
             nativeBridge.haptic("error");
         }
     };
+
+    const errorMessage = error || (result && !result.success ? result.message : null);
 
     return (
         <AnimatePresence>
@@ -149,6 +151,15 @@ export function RedeemModal({ open, card, onClose, onRedeemed }: Props) {
                                             </span>
                                         </div>
                                     </div>
+
+                                    {errorMessage && (
+                                        <p
+                                            role="alert"
+                                            className="mt-4 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                                        >
+                                            {errorMessage}
+                                        </p>
+                                    )}
 
                                     <div className="mt-5 space-y-2">
                                         <PrimaryButton

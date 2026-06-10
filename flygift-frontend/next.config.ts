@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
-const apiOrigin = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.flygift.com";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.flygift.com";
+// connect-src must be the host origin (no path) so /api/* subpaths are allowed.
+const apiConnectOrigin = (() => {
+  try {
+    return new URL(apiBaseUrl).origin;
+  } catch {
+    return apiBaseUrl.replace(/\/api\/?$/, "");
+  }
+})();
 
 /**
  * Strict CSP for the Cinematic Skyline app.
@@ -21,8 +29,8 @@ const csp = [
   `img-src 'self' data: blob: https:`,
   `font-src 'self' https://fonts.gstatic.com data:`,
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-  `script-src 'self' ${isDev ? "'unsafe-inline' 'unsafe-eval'" : "'unsafe-inline'"}`,
-  `connect-src 'self' ${apiOrigin}${isDev ? " ws: http://localhost:* http://127.0.0.1:*" : ""}`,
+  `script-src 'self' ${isDev ? "'unsafe-inline' 'unsafe-eval'" : "'unsafe-inline'"} https://static.cloudflareinsights.com`,
+  `connect-src 'self' ${apiConnectOrigin}${isDev ? " ws: http://localhost:* http://127.0.0.1:*" : " https://cloudflareinsights.com"}`,
   `manifest-src 'self'`,
   `worker-src 'self' blob:`,
   `upgrade-insecure-requests`,

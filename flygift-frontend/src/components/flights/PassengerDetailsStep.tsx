@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, BookUser } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { TextField } from "@/components/ui/FormFields";
+import { TextField, DateField } from "@/components/ui/FormFields";
 import { PrimaryButton, GhostButton } from "@/components/ui/Buttons";
 import { t } from "@/i18n/he";
 
@@ -17,10 +17,12 @@ export interface PassengerDetails {
 }
 
 interface Props {
-    initial?: Partial<PassengerDetails>;
+    initial?: PassengerDetails[];
+    /** How many passenger forms to render. Pulled from the search request. */
+    count: number;
     /** Earliest date the passenger could fly — used to validate passport expiry. */
     departureDate: string;
-    onSubmit: (details: PassengerDetails) => void;
+    onSubmit: (details: PassengerDetails[]) => void;
     onBack: () => void;
 }
 
@@ -33,86 +35,96 @@ const addMonths = (iso: string, m: number) => {
     return d.toISOString().slice(0, 10);
 };
 
+const blank = (): PassengerDetails => ({
+    firstName: "",
+    lastName: "",
+    passportNumber: "",
+    passportExpiry: "",
+    birthDate: "",
+});
+
 export function PassengerDetailsStep({
     initial,
+    count,
     departureDate,
     onSubmit,
     onBack,
 }: Props) {
-    const [firstName, setFirstName] = useState(initial?.firstName ?? "");
-    const [lastName, setLastName] = useState(initial?.lastName ?? "");
-    const [passportNumber, setPassportNumber] = useState(
-        initial?.passportNumber ?? ""
-    );
-    const [passportExpiry, setPassportExpiry] = useState(
-        initial?.passportExpiry ?? ""
-    );
-    const [birthDate, setBirthDate] = useState(initial?.birthDate ?? "");
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [warnings, setWarnings] = useState<Record<string, string>>({});
+    const [list, setList] = useState<PassengerDetails[]>(() => {
+        const seed = initial ?? [];
+        return Array.from({ length: Math.max(1, count) }, (_, i) => seed[i] ?? blank());
+    });
+    const [errors, setErrors] = useState<Record<number, Record<string, string>>>({});
+    const [warnings, setWarnings] = useState<Record<number, Record<string, string>>>({});
 
-    const validate = (): boolean => {
+    const update = (i: number, patch: Partial<PassengerDetails>) => {
+        setList((prev) => prev.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+    };
+
+    const validateOne = (
+        p: PassengerDetails,
+    ): { e: Record<string, string>; w: Record<string, string> } => {
         const e: Record<string, string> = {};
         const w: Record<string, string> = {};
 
-        if (!firstName.trim()) e.firstName = t.flights.errors.required;
-        else if (!LATIN_NAME_RE.test(firstName.trim()))
+        if (!p.firstName.trim()) e.firstName = t.flights.errors.required;
+        else if (!LATIN_NAME_RE.test(p.firstName.trim()))
             e.firstName = t.flights.passengerStep.errors.latinOnly;
 
-        if (!lastName.trim()) e.lastName = t.flights.errors.required;
-        else if (!LATIN_NAME_RE.test(lastName.trim()))
+        if (!p.lastName.trim()) e.lastName = t.flights.errors.required;
+        else if (!LATIN_NAME_RE.test(p.lastName.trim()))
             e.lastName = t.flights.passengerStep.errors.latinOnly;
 
-        if (!passportNumber.trim())
-            e.passportNumber = t.flights.errors.required;
-        else if (!PASSPORT_RE.test(passportNumber.trim()))
+        if (!p.passportNumber.trim()) e.passportNumber = t.flights.errors.required;
+        else if (!PASSPORT_RE.test(p.passportNumber.trim()))
             e.passportNumber = t.flights.passengerStep.errors.passportFormat;
 
-        if (!passportExpiry) e.passportExpiry = t.flights.errors.required;
+        if (!p.passportExpiry) e.passportExpiry = t.flights.errors.required;
+        else if (p.passportExpiry < departureDate)
+            e.passportExpiry = t.flights.passengerStep.errors.passportExpired;
+        else if (p.passportExpiry < addMonths(departureDate, 6))
+            w.passportExpiry = t.flights.passengerStep.errors.passportSoonExpire;
+
+        if (!p.birthDate) e.birthDate = t.flights.errors.required;
+        else if (p.birthDate > todayISO())
+            e.birthDate = t.flights.passengerStep.errors.birthDateFuture;
         else {
-            // Must be after departure date
-            if (passportExpiry < departureDate)
-                e.passportExpiry =
-                    t.flights.passengerStep.errors.passportExpired;
-            else if (passportExpiry < addMonths(departureDate, 6))
-                w.passportExpiry =
-                    t.flights.passengerStep.errors.passportSoonExpire;
+            const ageMs = Date.now() - new Date(p.birthDate).getTime();
+            const years = ageMs / (365.25 * 24 * 3600 * 1000);
+            if (years < 2) e.birthDate = t.flights.passengerStep.errors.tooYoung;
         }
 
-        if (!birthDate) e.birthDate = t.flights.errors.required;
-        else {
-            if (birthDate > todayISO())
-                e.birthDate = t.flights.passengerStep.errors.birthDateFuture;
-            else {
-                const ageMs = Date.now() - new Date(birthDate).getTime();
-                const years = ageMs / (365.25 * 24 * 3600 * 1000);
-                if (years < 2)
-                    e.birthDate = t.flights.passengerStep.errors.tooYoung;
-            }
-        }
-
-        setErrors(e);
-        setWarnings(w);
-        return Object.keys(e).length === 0;
+        return { e, w };
     };
 
     const submit = () => {
-        if (!validate()) return;
-        onSubmit({
-            firstName: firstName.trim().toUpperCase(),
-            lastName: lastName.trim().toUpperCase(),
-            passportNumber: passportNumber.trim().toUpperCase(),
-            passportExpiry,
-            birthDate,
+        const allErrors: Record<number, Record<string, string>> = {};
+        const allWarnings: Record<number, Record<string, string>> = {};
+        let invalid = false;
+        list.forEach((p, i) => {
+            const { e, w } = validateOne(p);
+            if (Object.keys(e).length > 0) invalid = true;
+            allErrors[i] = e;
+            allWarnings[i] = w;
         });
+        setErrors(allErrors);
+        setWarnings(allWarnings);
+        if (invalid) return;
+
+        onSubmit(
+            list.map((p) => ({
+                firstName: p.firstName.trim().toUpperCase(),
+                lastName: p.lastName.trim().toUpperCase(),
+                passportNumber: p.passportNumber.trim().toUpperCase(),
+                passportExpiry: p.passportExpiry,
+                birthDate: p.birthDate,
+            })),
+        );
     };
 
     return (
         <div className="mx-auto max-w-2xl space-y-5 py-6" dir="rtl">
-            <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
                 <p className="text-[10px] uppercase tracking-[0.25em] text-cyan-deep dark:text-cyan-jet">
                     {t.flights.passengerStep.kicker}
                 </p>
@@ -124,66 +136,17 @@ export function PassengerDetailsStep({
                 </p>
             </motion.div>
 
-            <GlassCard padding="lg" tone="elevated" className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-deep/10 text-cyan-deep dark:bg-cyan-jet/10 dark:text-cyan-jet">
-                        <BookUser className="h-5 w-5" />
-                    </div>
-                    <p className="text-sm text-text-secondary">
-                        {t.flights.passengerStep.subtitle}
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <TextField
-                        label={t.flights.passengerStep.firstName}
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        placeholder={t.flights.passengerStep.firstNameSample}
-                        error={errors.firstName}
-                        autoComplete="given-name"
-                        // Latin-only: hint browsers to use English keyboard
-                        inputMode="text"
-                        dir="ltr"
-                    />
-                    <TextField
-                        label={t.flights.passengerStep.lastName}
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        placeholder={t.flights.passengerStep.lastNameSample}
-                        error={errors.lastName}
-                        autoComplete="family-name"
-                        inputMode="text"
-                        dir="ltr"
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <TextField
-                        label={t.flights.passengerStep.passportNumber}
-                        value={passportNumber}
-                        onChange={(e) => setPassportNumber(e.target.value)}
-                        placeholder={t.flights.passengerStep.passportSample}
-                        error={errors.passportNumber}
-                        dir="ltr"
-                    />
-                    <DateField
-                        label={t.flights.passengerStep.passportExpiry}
-                        value={passportExpiry}
-                        onChange={setPassportExpiry}
-                        min={todayISO()}
-                        error={errors.passportExpiry}
-                        warning={warnings.passportExpiry}
-                    />
-                    <DateField
-                        label={t.flights.passengerStep.birthDate}
-                        value={birthDate}
-                        onChange={setBirthDate}
-                        max={todayISO()}
-                        error={errors.birthDate}
-                    />
-                </div>
-            </GlassCard>
+            {list.map((p, i) => (
+                <PassengerCard
+                    key={i}
+                    index={i}
+                    total={list.length}
+                    value={p}
+                    onChange={(patch) => update(i, patch)}
+                    errors={errors[i] ?? {}}
+                    warnings={warnings[i] ?? {}}
+                />
+            ))}
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
                 <GhostButton type="button" onClick={onBack} className="sm:w-auto">
@@ -200,40 +163,87 @@ export function PassengerDetailsStep({
     );
 }
 
-function DateField({
-    label,
+function PassengerCard({
+    index,
+    total,
     value,
     onChange,
-    min,
-    max,
-    error,
-    warning,
+    errors,
+    warnings,
 }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    min?: string;
-    max?: string;
-    error?: string;
-    warning?: string;
+    index: number;
+    total: number;
+    value: PassengerDetails;
+    onChange: (patch: Partial<PassengerDetails>) => void;
+    errors: Record<string, string>;
+    warnings: Record<string, string>;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label className="block text-xs font-medium uppercase tracking-wider text-[#475569] dark:text-text-secondary">
-                {label}
-            </label>
-            <input
-                type="date"
-                value={value}
-                min={min}
-                max={max}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-xl border border-[#0F172A]/20 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] px-3 py-3 text-base text-[#0F172A] dark:text-text-primary focus:outline-none focus:border-cyan-jet/60 focus:bg-white/90 dark:focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(14,165,233,0.12)]"
-            />
-            {error && <p className="text-xs text-danger">{error}</p>}
-            {!error && warning && (
-                <p className="text-xs text-warning">{warning}</p>
-            )}
-        </div>
+        <GlassCard padding="lg" tone="elevated" className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-deep/10 text-cyan-deep dark:bg-cyan-jet/10 dark:text-cyan-jet">
+                        <BookUser className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="text-xs uppercase tracking-wider text-text-secondary">
+                            נוסע {index + 1} מתוך {total}
+                        </p>
+                        <p className="text-sm text-text-primary">
+                            {t.flights.passengerStep.subtitle}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TextField
+                    label={t.flights.passengerStep.firstName}
+                    value={value.firstName}
+                    onChange={(e) => onChange({ firstName: e.target.value })}
+                    placeholder={t.flights.passengerStep.firstNameSample}
+                    error={errors.firstName}
+                    autoComplete="given-name"
+                    inputMode="text"
+                    dir="ltr"
+                />
+                <TextField
+                    label={t.flights.passengerStep.lastName}
+                    value={value.lastName}
+                    onChange={(e) => onChange({ lastName: e.target.value })}
+                    placeholder={t.flights.passengerStep.lastNameSample}
+                    error={errors.lastName}
+                    autoComplete="family-name"
+                    inputMode="text"
+                    dir="ltr"
+                />
+            </div>
+
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
+                <TextField
+                    label={t.flights.passengerStep.passportNumber}
+                    value={value.passportNumber}
+                    onChange={(e) => onChange({ passportNumber: e.target.value })}
+                    placeholder={t.flights.passengerStep.passportSample}
+                    error={errors.passportNumber}
+                    dir="ltr"
+                />
+                <DateField
+                    label={t.flights.passengerStep.passportExpiry}
+                    value={value.passportExpiry}
+                    onChange={(v) => onChange({ passportExpiry: v })}
+                    min={todayISO()}
+                    error={errors.passportExpiry}
+                    warning={warnings.passportExpiry}
+                />
+                <DateField
+                    label={t.flights.passengerStep.birthDate}
+                    value={value.birthDate}
+                    onChange={(v) => onChange({ birthDate: v })}
+                    max={todayISO()}
+                    error={errors.birthDate}
+                />
+            </div>
+        </GlassCard>
     );
 }

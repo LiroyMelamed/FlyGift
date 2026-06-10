@@ -2,15 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ========== Cinematic Skyline tokens (dark = primary) ========== */
+/* ========== Brand palette tokens (Stage 24) ==========
+   Primary navy #0D1B2A · Luxury gold #F2C55C · Turquoise #00C2CB.
+   Light variant uses brand neutral #F1F3F5 as the canvas. */
 :root {
-  --bg-base: #050814;
-  --bg-elevated: #0b1228;
-  --bg-glass: rgba(20, 28, 56, 0.55);
+  --bg-base: #0D1B2A;
+  --bg-elevated: #112538;
+  --bg-glass: rgba(13, 27, 42, 0.55);
   --border-glass: rgba(255, 255, 255, 0.08);
 
-  --accent-primary: #00e5ff;
-  --accent-gold: #d4af7a;
+  --accent-primary: #00C2CB;
+  --accent-gold: #F2C55C;
   --accent-violet: #7c5cff;
 
   --text-primary: #f4f7ff;
@@ -20,16 +22,16 @@
 }
 
 .light {
-  --bg-base: #eaf6ff;
+  --bg-base: #F1F3F5;
   --bg-elevated: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.4);
-  --border-glass: rgba(15, 23, 42, 0.10);
+  --bg-glass: rgba(255, 255, 255, 0.55);
+  --border-glass: rgba(13, 27, 42, 0.10);
 
-  --accent-primary: #0066ff;
-  --accent-gold: #b7894c;
+  --accent-primary: #00C2CB;
+  --accent-gold: #B8932F;
   --accent-violet: #5b3dd9;
 
-  --text-primary: #0F172A;
+  --text-primary: #0D1B2A;
   --text-secondary: #475569;
 
   color-scheme: light;
@@ -61,6 +63,27 @@ body {
   textarea {
     font-size: 16px;
   }
+}
+
+/* Native date pickers overflow narrow/RTL containers on mobile Safari. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: start;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  margin-inline-start: 0.25rem;
 }
 
 html,

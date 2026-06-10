@@ -4,9 +4,40 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Search, Plane, Gift, ArrowRight, X } from "lucide-react";
-import { MOCK_TRIPS, searchTrips } from "@/lib/mockTrips";
+import { useAppDerived } from "@/lib/appStore";
 import { nativeBridge } from "@/utils/nativeBridge";
+import { t } from "@/i18n/he";
 import type { Trip } from "@/lib/tripTypes";
+import type { MockGiftCard } from "@/lib/mockData";
+
+function searchTrips(all: Trip[], q: string): Trip[] {
+    const term = q.trim().toLowerCase();
+    if (!term) return all;
+    return all.filter(
+        (tr) =>
+            String(tr.bookingId).includes(term) ||
+            tr.bookingReference?.toLowerCase().includes(term) ||
+            tr.destination.toLowerCase().includes(term) ||
+            tr.destinationCity.toLowerCase().includes(term) ||
+            tr.origin.toLowerCase().includes(term) ||
+            tr.originCity.toLowerCase().includes(term) ||
+            tr.flightNumber.toLowerCase().includes(term)
+    );
+}
+
+function searchCards(all: MockGiftCard[], q: string): MockGiftCard[] {
+    const term = q.trim().toLowerCase();
+    if (!term) return all;
+    return all.filter(
+        (c) =>
+            c.id.toLowerCase().includes(term) ||
+            c.code.toLowerCase().includes(term) ||
+            c.senderName.toLowerCase().includes(term) ||
+            c.recipientName.toLowerCase().includes(term) ||
+            c.category.toLowerCase().includes(term) ||
+            String(c.amount).includes(term)
+    );
+}
 
 interface Props {
     open: boolean;
@@ -26,6 +57,7 @@ export function GlobalSearch({ open, onClose }: Props) {
     const [q, setQ] = useState("");
     const router = useRouter();
     const inputRef = useRef<HTMLInputElement>(null);
+    const { bookings, cards } = useAppDerived();
 
     useEffect(() => {
         if (open) {
@@ -47,16 +79,22 @@ export function GlobalSearch({ open, onClose }: Props) {
 
     const results = useMemo<Result[]>(() => {
         if (!q.trim()) return [];
-        const all = [...MOCK_TRIPS.upcoming, ...MOCK_TRIPS.past];
-        const trips: Result[] = searchTrips(all, q).slice(0, 8).map((t: Trip) => ({
+        const trips: Result[] = searchTrips(bookings, q).slice(0, 6).map((tr: Trip) => ({
             kind: "trip",
-            id: `trip-${t.bookingId}`,
-            primary: `${t.origin} → ${t.destination} · ${t.flightNumber}`,
-            secondary: `${t.originCity} to ${t.destinationCity} · Ref ${t.bookingReference ?? "—"}`,
-            href: `/bookings/mine?focus=${t.bookingId}`,
+            id: `trip-${tr.bookingId}`,
+            primary: `${tr.origin} → ${tr.destination} · ${tr.flightNumber}`,
+            secondary: `${tr.originCity} → ${tr.destinationCity} · ${tr.bookingReference ?? "—"}`,
+            href: `/bookings/mine?focus=${tr.bookingId}`,
         }));
-        return trips;
-    }, [q]);
+        const gifts: Result[] = searchCards(cards, q).slice(0, 6).map((c) => ({
+            kind: "gift",
+            id: `gift-${c.id}`,
+            primary: `${c.code} · ${c.amount.toLocaleString()} ${c.currency}`,
+            secondary: `${c.senderName} → ${c.recipientName}`,
+            href: `/gifts/${c.code}`,
+        }));
+        return [...trips, ...gifts];
+    }, [q, bookings, cards]);
 
     const go = (href: string) => {
         nativeBridge.haptic("light");
@@ -80,6 +118,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                         exit={{ y: -8, opacity: 0, scale: 0.98 }}
                         transition={{ type: "spring", stiffness: 320, damping: 28 }}
                         onClick={(e) => e.stopPropagation()}
+                        dir="rtl"
                         className="w-full max-w-xl rounded-2xl border border-white/10 bg-bg-elevated/90 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden"
                     >
                         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
@@ -88,7 +127,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                                 ref={inputRef}
                                 value={q}
                                 onChange={(e) => setQ(e.target.value)}
-                                placeholder="Search bookings by ID, destination, flight…"
+                                placeholder={t.search.placeholder}
                                 className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/60 focus:outline-none"
                             />
                             <kbd className="hidden sm:inline-flex items-center rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-text-secondary">
@@ -98,7 +137,7 @@ export function GlobalSearch({ open, onClose }: Props) {
                                 type="button"
                                 onClick={onClose}
                                 className="rounded-full p-1 text-text-secondary hover:text-text-primary hover:bg-white/5 sm:hidden"
-                                aria-label="Close"
+                                aria-label={t.search.close}
                             >
                                 <X className="h-4 w-4" />
                             </button>
@@ -107,11 +146,11 @@ export function GlobalSearch({ open, onClose }: Props) {
                         <div className="max-h-[60vh] overflow-y-auto py-2">
                             {!q.trim() ? (
                                 <div className="px-4 py-6 text-center text-xs text-text-secondary">
-                                    Try a destination (CDG), flight (AF221), or booking ref.
+                                    {t.search.hint}
                                 </div>
                             ) : results.length === 0 ? (
                                 <div className="px-4 py-6 text-center text-xs text-text-secondary">
-                                    No matches for &ldquo;{q}&rdquo;.
+                                    {t.search.noMatches(q)}
                                 </div>
                             ) : (
                                 <ul className="space-y-0.5 px-2">

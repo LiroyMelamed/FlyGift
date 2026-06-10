@@ -16,7 +16,7 @@ export const DEFAULT_DRAFT: GiftDraft = {
     recipientEmail: "",
     message: "",
     amount: 250,
-    currency: "ILS",
+    currency: "USD",
     variant: "cyan-jet",
     category: "Flights",
     // Default 1-year expiration
@@ -29,6 +29,6 @@ export type StepKey = "recipient" | "amount" | "review" | "success";
 
 export const STEP_LABELS: Record<Exclude<StepKey, "success">, string> = {
     recipient: "מקבל",
-    amount: "עיצוב",
+    amount: "סכום",
     review: "אישור",
 };

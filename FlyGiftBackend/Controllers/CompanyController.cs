@@ -18,6 +18,9 @@ namespace FlyGiftBackend.Controllers
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel",
             "application/octet-stream",
+            "text/csv",
+            "application/csv",
+            "text/plain", // Some browsers tag .csv as text/plain
         };
 
         private readonly IBulkGiftCardService _bulk;
@@ -46,7 +49,7 @@ namespace FlyGiftBackend.Controllers
             if (file.Length > MaxFileSizeBytes)
                 return BadRequest(new GeneralResponse(false, "File too large (max 5MB).", Request.Path));
             if (!AllowedContentTypes.Contains(file.ContentType))
-                return BadRequest(new GeneralResponse(false, "Only .xlsx files are accepted.", Request.Path));
+                return BadRequest(new GeneralResponse(false, "רק קבצי .xlsx או .csv נתמכים.", Request.Path));
 
             try
             {
@@ -69,7 +72,7 @@ namespace FlyGiftBackend.Controllers
         [RequestSizeLimit(MaxFileSizeBytes)]
         public async Task<IActionResult> ConfirmBulkUpload(
             IFormFile file,
-            [FromForm] string defaultCurrency = "USD",
+            [FromForm] string defaultCurrency = "ILS",
             [FromForm] DateTime? expirationDate = null,
             CancellationToken ct = default)
         {

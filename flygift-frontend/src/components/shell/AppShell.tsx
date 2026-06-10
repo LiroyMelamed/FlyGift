@@ -5,6 +5,8 @@ import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { Sidebar } from "./Sidebar";
 import { useIsWebView } from "@/hooks/useIsWebView";
+import { hydrateUserFromJwt } from "@/lib/appStore";
+import { useHydrateBootstrap } from "@/hooks/useHydrateBootstrap";
 import { cn } from "@/utils/cn";
 
 export interface AppShellProps {
@@ -17,6 +19,8 @@ export function AppShell({ children, initialIsWebView = false }: AppShellProps) 
     const detectedWebView = useIsWebView();
     const isWebView = initialIsWebView || detectedWebView;
 
+    useHydrateBootstrap();
+
     useEffect(() => {
         if (isWebView) {
             document.documentElement.classList.add("is-webview");
@@ -25,6 +29,13 @@ export function AppShell({ children, initialIsWebView = false }: AppShellProps) 
             document.documentElement.classList.remove("is-webview");
         };
     }, [isWebView]);
+
+    // Pull role + display name out of the JWT cookie on every app
+    // boot so the sidebar / dashboard redirect have it before the
+    // first interactive render. No-op for guests.
+    useEffect(() => {
+        hydrateUserFromJwt();
+    }, []);
 
     return (
         <div className="relative min-h-dvh">
@@ -38,16 +49,25 @@ export function AppShell({ children, initialIsWebView = false }: AppShellProps) 
                     {!isWebView && <Sidebar />}
                     <main
                         className={cn(
-                            "flex-1 px-4 sm:px-6 lg:px-8",
+                            "min-w-0 flex-1 px-4 sm:px-6 lg:px-8",
+                            // BottomNav is fixed-position and only renders
+                            // below `lg`; reserve room for it everywhere
+                            // it can show (mobile/tablet web + every webview).
                             "pb-24 lg:pb-12",
                             isWebView && "pb-28"
                         )}
                     >
-                        <div className="mx-auto w-full max-w-6xl">{children}</div>
+                        <div className="mx-auto w-full min-w-0 max-w-6xl">{children}</div>
                     </main>
                 </div>
 
-                {isWebView && <BottomNav />}
+                {/*
+                  * BottomNav now renders on every viewport below `lg` (not
+                  * just webviews) so mobile-browser users get the same
+                  * primary nav. The Sidebar handles `lg+`; BottomNav
+                  * hides itself there via `lg:hidden`.
+                  */}
+                <BottomNav />
             </div>
         </div>
     );

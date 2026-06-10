@@ -13,6 +13,10 @@ namespace FlyGiftBackend.Services.Flights
     {
         public string ProviderName => "Mock";
 
+        // Deterministic in-memory generator — no upstream is contacted, so
+        // it's by definition test mode for booking-status purposes.
+        public bool IsTestMode => true;
+
         private static readonly CarrierInfo[] Carriers =
         {
             new() { Iata = "LY", Name = "El Al",        LogoUrl = "/carriers/ly.svg" },
@@ -122,7 +126,7 @@ namespace FlyGiftBackend.Services.Flights
                         Base = basePrice,
                         Taxes = taxes,
                         Total = total,
-                        Currency = "USD",
+                        Currency = "ILS",
                         MarketMedian = Math.Round(total * (1 + (rng.Next(-5, 20) / 100m)), 2),
                     },
                     Stops = stops,

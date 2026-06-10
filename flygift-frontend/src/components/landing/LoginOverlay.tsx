@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, X } from "lucide-react";
+import axios from "axios";
 import { ApiUtils } from "@/utils/ApiUtils";
 import { t } from "@/i18n/he";
 import { useLoginOverlay } from "./LoginOverlayContext";
@@ -45,7 +46,7 @@ export function LoginOverlay() {
             const res = await ApiUtils.post("Auth/Login", {
                 Username: username,
                 PasswordHash: password,
-            }).startRequest();
+            }, { timeout: 45_000 }).startRequest();
 
             const token =
                 (res?.data as string | undefined) ??
@@ -60,8 +61,12 @@ export function LoginOverlay() {
             close();
             router.replace("/dashboard");
         } catch (err) {
-            const msg =
-                err instanceof Error && err.message
+            const isTimeout =
+                axios.isAxiosError(err)
+                && (err.code === "ECONNABORTED" || err.message.includes("timeout"));
+            const msg = isTimeout
+                ? t.auth.loginSlow
+                : err instanceof Error && err.message
                     ? err.message
                     : t.auth.invalidCredentials;
             setError(msg);

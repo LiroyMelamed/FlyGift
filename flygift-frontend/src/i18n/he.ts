@@ -11,6 +11,13 @@ export const t = {
     tagline: "מתנת הטיסה",
 
     // Sidebar / nav
+    search: {
+        placeholder: "חיפוש לפי מס׳ הזמנה, יעד או טיסה",
+        hint: "נסו יעד (CDG), מס׳ טיסה (AF221) או מס׳ הזמנה",
+        noMatches: (q: string) => `לא נמצאו תוצאות עבור „${q}״.`,
+        close: "סגירה",
+    },
+
     nav: {
         dashboard: "דאשבורד",
         myGifts: "המתנות שלי",
@@ -20,6 +27,7 @@ export const t = {
         hotels: "מלונות",
         settings: "הגדרות",
         travel: "נסיעות",
+        myTrips: "הנסיעות שלי",
         redeem: "מימוש קוד",
         profile: "הפרופיל שלי",
         notifications: "התראות",
@@ -27,12 +35,19 @@ export const t = {
         account: "חשבון",
         back: "חזרה",
         signOut: "התנתקות",
+        companySection: "אזור החברה",
+        insights: "תובנות",
+        bulkUpload: "העלאת אקסל",
+        billing: "חיובים",
     },
 
     // Dashboard
     dashboard: {
         welcomeBack: "ברוך שובך",
         totalBalance: "יתרה כוללת",
+        walletBalance: "יתרה בארנק",
+        unredeemedGifts: (amount: string) => `+ ${amount} במתנות פעילות (טרם מומשו)`,
+        walletReady: "זמין לשימוש מיידי",
         across: (n: number) => `מפוזרת על ${n} מתנות פעילות`,
         viewLedger: "צפייה בפנקס היומן",
         quickActions: "פעולות מהירות",
@@ -82,6 +97,7 @@ export const t = {
         noAccount: "אין לך חשבון?",
         createAccount: "יצירת חשבון",
         invalidCredentials: "שם משתמש או סיסמה לא נכונים.",
+        loginSlow: "ההתחברות לוקחת יותר מדי זמן. נסו שוב בעוד רגע.",
         welcome: "ברוכים הבאים ל-FlyGift",
         welcomeSub: "התחבר כדי לראות את היתרה והמתנות שלך.",
     },
@@ -89,7 +105,8 @@ export const t = {
     // Redeem
     redeem: {
         title: "מימוש קוד מתנה",
-        subtitle: "הזן את קוד המתנה שלך כדי להוסיף את הסכום ליתרה.",
+        subtitle:
+            "הזן את קוד המתנה שלך כדי להוסיף את הסכום ליתרה. יש לממש מחשבון הנמען — לא מחשבון השולח.",
         codeLabel: "קוד מתנה",
         codePlaceholder: "לדוגמה: FG-A1B2-C3D4",
         cta: "ממש עכשיו",
@@ -97,6 +114,7 @@ export const t = {
         successTitle: "המימוש הושלם בהצלחה",
         successBody: (amount: string) => `${amount} נוספו ליתרת הנסיעות שלך.`,
         invalid: "הקוד אינו תקף או נוצל בעבר.",
+        alreadyRedeemed: "כרטיס המתנה כבר מומש. לא ניתן לממש אותו שוב.",
     },
 
     // Profile
@@ -110,10 +128,13 @@ export const t = {
         },
         fullName: "שם מלא",
         email: "דוא\"ל",
+        emailHint: "השתמשו בכתובת Gmail/Outlook אמיתית — כתובות בדיקה (.test) לא מתקבלות בהזמנת טיסות.",
         phone: "מספר טלפון",
         changePassword: "שינוי סיסמה",
         twoFactor: "אימות דו-שלבי",
         save: "שמור שינויים",
+        saveSuccess: "הפרופיל עודכן בהצלחה.",
+        saveFailed: "שמירת הפרופיל נכשלה. נסו שוב.",
         signOut: "התנתק מהחשבון",
     },
 
@@ -236,17 +257,66 @@ export const t = {
         addToWallet: "הוסף ל-Wallet",
         searchAnother: "חיפוש טיסה נוספת",
         downloadTicket: "הורדת הכרטיס (PDF)",
+        paymentMethodRequired:
+            "היתרה לא מספיקה לכיסוי מלוא הסכום. הזינו אמצעי תשלום להמשך.",
         // Passenger summary in checkout (read-only)
         passengerLabel: "נוסע",
         passportLabel: "דרכון",
         editPassenger: "ערוך פרטי נוסע",
     },
 
+    // Company analytics dashboard
+    analytics: {
+        kicker: "תובנות לחברה",
+        title: "דאשבורד ROI",
+        subtitle: (days: number, generatedAt: string) =>
+            `${days} ימים אחרונים · נוצר ב־${generatedAt}`,
+        demoBadge: "מצב תצוגה",
+        sections: {
+            insights: "תובנות",
+            billing: "חיובים",
+        },
+        actions: {
+            csv: "ייצוא CSV",
+            exportReport: "ייצוא דוח",
+        },
+        kpis: {
+            distributed: "חולקו",
+            redeemed: "מומשו",
+            avgGift: "מתנה ממוצעת",
+            avgDaysToRedeem: "זמן מימוש ממוצע",
+            cardsCount: (n: number) => `${n} כרטיסים`,
+            daysSuffix: (n: number) => `${n.toFixed(1)} ימים`,
+        },
+        trend: {
+            kicker: "מגמת שימוש",
+            title: "חולקו לעומת מומשו",
+            legendDistributed: "חולקו",
+            legendUsed: "מומשו",
+        },
+        redemption: {
+            kicker: "שיעור מימוש",
+            title: "בריאות מעורבות",
+            ringLabel: "מומשו",
+            ringSublabel: (used: number, total: number) =>
+                `${used} מתוך ${total} כרטיסים בשימוש`,
+            pillActive: "פעילים",
+            pillUsed: "מומשו",
+            pillExpired: "פג תוקף",
+        },
+        destinations: {
+            kicker: "יעדים מובילים",
+            title: "לאן המתנות שלך טסות",
+        },
+    },
+
     // Travel hub / My Trips
     trips: {
         kicker: "מרכז הנסיעות",
         title: "הנסיעות שלי",
-        availableBalance: "יתרה זמינה",
+        availableBalance: "יתרה בארנק",
+        unredeemedGifts: (amount: string) => `+ ${amount} במתנות פעילות (טרם מומשו)`,
+        walletReady: "זמין לשימוש מיידי",
         across: (n: number) => `מפוזרת על ${n} מתנות פעילות`,
         premium: "פרימיום",
         upcomingPastSummary: (u: number, p: number) =>
@@ -261,6 +331,30 @@ export const t = {
             tab === "upcoming"
                 ? "אין נסיעות עתידיות התואמות לחיפוש."
                 : "אין נסיעות עבר התואמות לחיפוש.",
+        noBookings: "לא נמצאו הזמנות",
+        walletFailed: "לא ניתן להוסיף לארנק. נסו שוב מאוחר יותר.",
+        cell: {
+            ref: "מס׳ הזמנה",
+            paid: "שולם",
+            cabinClass: "מחלקה",
+            terminal: "טרמינל",
+            arrive: "נחיתה",
+            close: "סגירה",
+            cabinEconomy: "תיירים",
+            appleWallet: "Apple Wallet",
+            googleWallet: "Google Wallet",
+        },
+        flightStatus: {
+            "On Time": "בזמן",
+            Delayed: "בעיכוב",
+            Boarding: "עלייה למטוס",
+            "Gate Change": "שינוי שער",
+            Arrived: "נחתה",
+            Cancelled: "בוטלה",
+            Unknown: "—",
+        },
+        statusHint:
+            "הסטטוס מתעדכן לפי נתוני הספק. לשינויים בזמן אמת, עקבו אחר ההתראות באפליקציה.",
     },
 
     // Billing (B2B)
@@ -429,6 +523,8 @@ export const t = {
         searchFailed: "החיפוש נכשל. נסה שוב.",
         bookingFailed: "ההזמנה נכשלה. נסה שוב.",
         dbError: "שגיאה בהתחברות למסד הנתונים",
+        apiUnavailable:
+            "שרת ה-API זמנית לא זמין. המתן כ-30 שניות ונסה שוב.",
         searching: "מחפש…",
         noResults: "לא נמצאו תוצאות",
         backToDashboard: "חזרה ללוח הבקרה",

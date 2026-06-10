@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 import confetti from "canvas-confetti";
-import { CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, Send, MessageCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PrimaryButton, GhostButton } from "@/components/ui/Buttons";
 import { nativeBridge } from "@/utils/nativeBridge";
@@ -88,6 +88,12 @@ export function StepSuccess({ draft, code, onReset }: Props) {
             </GlassCard>
 
             <div className="space-y-2">
+                <WhatsAppShareButton
+                    recipientName={draft.recipientName}
+                    code={code}
+                    amount={draft.amount}
+                    currency={draft.currency}
+                />
                 <Link href="/dashboard" className="block">
                     <PrimaryButton type="button">חזרה למרכז השליטה</PrimaryButton>
                 </Link>
@@ -97,5 +103,43 @@ export function StepSuccess({ draft, code, onReset }: Props) {
                 </GhostButton>
             </div>
         </motion.div>
+    );
+}
+
+function WhatsAppShareButton({
+    recipientName,
+    code,
+    amount,
+    currency,
+}: {
+    recipientName: string;
+    code?: string;
+    amount: number;
+    currency: GiftDraft["currency"];
+}) {
+    const handleClick = () => {
+        nativeBridge.haptic("light");
+        const codeLine = code ? `\nקוד: ${code}` : "";
+        const origin =
+            typeof window !== "undefined" ? window.location.origin : "";
+        const link = code ? `\n${origin}/redeem?code=${encodeURIComponent(code)}` : "";
+        const message =
+            `היי ${recipientName}! 🎁 שלחתי לך מתנת FlyGift בסך ${formatCurrencyDetailed(
+                amount,
+                currency
+            )}.${codeLine}${link}`;
+        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        window.open(url, "_blank", "noopener,noreferrer");
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={handleClick}
+            className="ring-focus inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] text-sm font-semibold text-white shadow-[0_8px_22px_-10px_rgba(37,211,102,0.7)] transition-transform hover:-translate-y-0.5 active:translate-y-0"
+        >
+            <MessageCircle className="h-4 w-4" strokeWidth={2.4} />
+            שיתוף בוואטסאפ
+        </button>
     );
 }

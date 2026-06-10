@@ -18,5 +18,14 @@ namespace FlyGiftBackend.Repositories
         {
             return GetTable().Where(booking => booking.UserId == userId).ToList();
         }
+
+        public Task<List<FlightBooking>> GetByUserAsync(int userId)
+        {
+            return GetTable()
+                .AsNoTracking()
+                .Where(b => b.UserId == userId)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+        }
     }
 }

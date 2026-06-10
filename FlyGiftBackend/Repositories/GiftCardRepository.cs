@@ -25,8 +25,16 @@ namespace FlyGiftBackend.Repositories
                 .Include(g => g.Recipient)
                 .FirstOrDefaultAsync(g => g.Id == id);
 
+        public Task<GiftCard?> GetByShortCodeWithUsersAsync(string shortCode) =>
+            GetTable()
+                .Include(g => g.Sender)
+                .Include(g => g.Recipient)
+                .FirstOrDefaultAsync(g => g.ShortCode == shortCode);
+
         public Task<List<GiftCard>> GetByUserAsync(int userId) =>
             GetTable()
+                .Include(g => g.Sender)
+                .Include(g => g.Recipient)
                 .Where(g => g.SenderId == userId || g.RecipientId == userId)
                 .OrderByDescending(g => g.CreatedAt)
                 .ToListAsync();

@@ -32,10 +32,41 @@ const fontHeebo = Heebo({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://flygift.mela-media.co.il";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "FlyGift — שולחים חוויות",
   description:
     "כרטיסי מתנה פרימיום לטיסות ומלונות. שולחים חוויות, לא שוברים.",
+  openGraph: {
+    type: "website",
+    locale: "he_IL",
+    url: siteUrl,
+    siteName: "FlyGift",
+    title: "FlyGift — שולחים חוויות",
+    description:
+      "כרטיסי מתנה פרימיום לטיסות ומלונות. שולחים חוויות, לא שוברים.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "FlyGift — שולחים חוויות",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FlyGift — שולחים חוויות",
+    description:
+      "כרטיסי מתנה פרימיום לטיסות ומלונות. שולחים חוויות, לא שוברים.",
+    images: ["/opengraph-image"],
+  },
+  icons: {
+    icon: "/icon",
+    apple: "/icon",
+  },
 };
 
 export const viewport: Viewport = {

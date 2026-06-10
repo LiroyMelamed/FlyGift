@@ -23,6 +23,7 @@ export interface Trip {
     terminal?: string | null;
     bookingReference?: string | null;
     totalCharged?: number | null;
+    currency?: string | null;
     stops?: number | null;
     flightStatus: FlightStatus;
     isUpcoming: boolean;

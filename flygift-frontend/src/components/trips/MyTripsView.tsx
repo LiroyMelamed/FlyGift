@@ -6,30 +6,64 @@ import { Search, Plane, Sparkles } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TripCard } from "./TripCard";
 import { BoardingPassModal } from "./BoardingPassModal";
+import { FlightStatusModal } from "./FlightStatusModal";
 import { TransactionHistoryView } from "./TransactionHistoryView";
-import { MOCK_TRIPS, searchTrips } from "@/lib/mockTrips";
+import { useAppDerived } from "@/lib/appStore";
 import { formatCurrencyDetailed } from "@/utils/format";
 import { t } from "@/i18n/he";
 import type { Trip } from "@/lib/tripTypes";
 
+function searchTrips(all: Trip[], q: string): Trip[] {
+    const term = q.trim().toLowerCase();
+    if (!term) return all;
+    return all.filter(
+        (tr) =>
+            String(tr.bookingId).includes(term) ||
+            tr.bookingReference?.toLowerCase().includes(term) ||
+            tr.destination.toLowerCase().includes(term) ||
+            tr.destinationCity.toLowerCase().includes(term) ||
+            tr.origin.toLowerCase().includes(term) ||
+            tr.originCity.toLowerCase().includes(term) ||
+            tr.flightNumber.toLowerCase().includes(term)
+    );
+}
+
 /**
- * Stage 14 — Travel Hub. Renders an upcoming/past timeline; replace
- * MOCK_TRIPS with `ApiUtils.get('Bookings/MyTrips').startRequest()`
- * once the backend is reachable — payload shape matches.
+ * Stage 14 — Travel Hub. Hydrates bookings from `GET /api/Bookings/Mine`
+ * on mount and renders the upcoming/past timeline. The wallet snapshot
+ * at the top is computed from the live appStore (cards + transaction
+ * ledger), not a static mock.
  */
 export function MyTripsView() {
     const [tab, setTab] = useState<"upcoming" | "past" | "ledger">("upcoming");
     const [q, setQ] = useState("");
     const [pass, setPass] = useState<Trip | null>(null);
+    const [statusTrip, setStatusTrip] = useState<Trip | null>(null);
 
-    const all = MOCK_TRIPS;
+    const {
+        bookings,
+        upcomingBookings,
+        pastBookings,
+        walletBalance,
+        activeGiftCount,
+        activeCards,
+        user,
+    } = useAppDerived();
+
+    const unredeemedGiftTotal = useMemo(
+        () => activeCards.reduce((sum, c) => sum + c.amount, 0),
+        [activeCards]
+    );
+
     const list = useMemo(
         () =>
             tab === "ledger"
                 ? []
-                : searchTrips(tab === "upcoming" ? all.upcoming : all.past, q),
-        [tab, q, all]
+                : searchTrips(tab === "upcoming" ? upcomingBookings : pastBookings, q),
+        [tab, q, upcomingBookings, pastBookings]
     );
+
+    const noBookingsAtAll = bookings.length === 0;
 
     return (
         <div className="space-y-6 py-6" dir="rtl">
@@ -60,13 +94,17 @@ export function MyTripsView() {
                                 {t.trips.availableBalance}
                             </p>
                             <p className="mt-2 font-mono text-3xl font-semibold tabular-nums">
-                                {formatCurrencyDetailed(
-                                    all.wallet.totalActiveBalance,
-                                    all.wallet.currency
-                                )}
+                                {formatCurrencyDetailed(walletBalance, user.currency)}
                             </p>
                             <p className="mt-1 text-xs text-text-secondary">
-                                {t.trips.across(all.wallet.activeGiftCount)}
+                                {activeGiftCount > 0
+                                    ? t.trips.unredeemedGifts(
+                                        formatCurrencyDetailed(
+                                            unredeemedGiftTotal,
+                                            user.currency
+                                        )
+                                    )
+                                    : t.trips.walletReady}
                             </p>
                         </div>
                         <div className="hidden sm:flex flex-col items-end text-right">
@@ -74,7 +112,10 @@ export function MyTripsView() {
                                 <Sparkles className="h-3 w-3" /> {t.trips.premium}
                             </span>
                             <p className="mt-2 text-xs text-text-secondary">
-                                {t.trips.upcomingPastSummary(all.upcoming.length, all.past.length)}
+                                {t.trips.upcomingPastSummary(
+                                    upcomingBookings.length,
+                                    pastBookings.length
+                                )}
                             </p>
                         </div>
                     </div>
@@ -103,9 +144,9 @@ export function MyTripsView() {
                             )}
                             <span className="relative">
                                 {k === "upcoming"
-                                    ? t.trips.tabs.upcoming(all.upcoming.length)
+                                    ? t.trips.tabs.upcoming(upcomingBookings.length)
                                     : k === "past"
-                                        ? t.trips.tabs.past(all.past.length)
+                                        ? t.trips.tabs.past(pastBookings.length)
                                         : t.trips.tabs.ledger}
                             </span>
                         </button>
@@ -128,16 +169,20 @@ export function MyTripsView() {
             {tab === "ledger" ? (
                 <TransactionHistoryView />
             ) : (
-                <div className="relative sm:pr-8">
-                    {/* vertical line */}
+                <div className="relative sm:ps-8">
+                    {/* vertical line — inline-start = right in RTL */}
                     <span
                         aria-hidden
-                        className="absolute right-0 top-2 bottom-2 hidden w-px bg-gradient-to-b from-cyan-jet/40 via-violet-aurora/20 to-transparent sm:block"
+                        className="absolute start-0 top-2 bottom-2 hidden w-px bg-gradient-to-b from-cyan-jet/40 via-violet-aurora/20 to-transparent sm:block"
                     />
                     {list.length === 0 ? (
                         <GlassCard padding="lg" className="text-center text-text-secondary">
                             <Plane className="mx-auto h-6 w-6 text-text-secondary/60" />
-                            <p className="mt-2 text-sm">{t.trips.empty(tab)}</p>
+                            <p className="mt-2 text-sm">
+                                {noBookingsAtAll
+                                    ? t.trips.noBookings
+                                    : t.trips.empty(tab as "upcoming" | "past")}
+                            </p>
                         </GlassCard>
                     ) : (
                         <div className="space-y-4">
@@ -147,6 +192,7 @@ export function MyTripsView() {
                                     trip={tr}
                                     index={i}
                                     onShowBoardingPass={setPass}
+                                    onShowStatus={setStatusTrip}
                                 />
                             ))}
                         </div>
@@ -155,6 +201,7 @@ export function MyTripsView() {
             )}
 
             <BoardingPassModal trip={pass} onClose={() => setPass(null)} />
+            <FlightStatusModal trip={statusTrip} onClose={() => setStatusTrip(null)} />
         </div>
     );
 }

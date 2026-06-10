@@ -14,9 +14,10 @@ namespace FlyGiftBackend.Repositories
             return context.Users;
         }
 
-        public User GetUserByUsername(string username)
-        {
-            return GetTable().FirstOrDefault(u => u.UserName == username);
-        }
+        public Task<User?> GetByIdAsync(int id, CancellationToken ct = default) =>
+            GetTable().AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+
+        public Task<User?> GetUserByUsernameAsync(string username, CancellationToken ct = default) =>
+            GetTable().AsNoTracking().FirstOrDefaultAsync(u => u.UserName == username, ct);
     }
 }

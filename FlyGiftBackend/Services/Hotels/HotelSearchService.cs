@@ -3,7 +3,6 @@ using System.Text.Json;
 using FlyGiftBackend.Data;
 using FlyGiftBackend.Models;
 using FlyGiftBackend.Services.Ledger;
-using FlyGiftBackend.Services.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace FlyGiftBackend.Services.Hotels
@@ -13,25 +12,23 @@ namespace FlyGiftBackend.Services.Hotels
     /// RapidAPI / Booking.com schema so we can swap a real provider in
     /// without touching callers. Results are tagged with affordability
     /// against the user's wallet balance and the booking pipeline runs
-    /// the same split-payment flow as flights.
+    /// wallet-only (post-Stripe removal) — the user must top up via Grow
+    /// before booking if balance is insufficient.
     /// </summary>
     public class HotelSearchService : IHotelSearchService
     {
         private static readonly ConcurrentDictionary<string, HotelOffer> _offerCache = new();
 
         private readonly AppDbContext _db;
-        private readonly IPaymentProvider _payments;
         private readonly IBalanceService _balance;
         private readonly ILogger<HotelSearchService> _log;
 
         public HotelSearchService(
             AppDbContext db,
-            IPaymentProvider payments,
             IBalanceService balance,
             ILogger<HotelSearchService> log)
         {
             _db = db;
-            _payments = payments;
             _balance = balance;
             _log = log;
         }
@@ -61,7 +58,7 @@ namespace FlyGiftBackend.Services.Hotels
                 Nights = nights,
                 City = request.City,
                 AccountBalance = balance,
-                Currency = "USD",
+                Currency = "ILS",
                 Offers = offers
                     .OrderByDescending(o => o.AffordableFromBalance)
                     .ThenBy(o => o.NightlyRate)
@@ -90,32 +87,25 @@ namespace FlyGiftBackend.Services.Hotels
 
             var ledgerBalance = await _balance.GetBalanceAsync(userId, ct);
             var total = offer.TotalPrice;
-            var fromBalance = Math.Min(ledgerBalance, total);
-            var fromCard = total - fromBalance;
 
-            if (fromCard > 0 && string.IsNullOrWhiteSpace(request.PaymentMethodToken))
+            // Wallet-only: no card path. Top-ups happen separately through
+            // Grow once that flow is wired; until then the user must
+            // pre-fund via the wallet to book a hotel.
+            if (ledgerBalance < total)
                 throw new InvalidOperationException(
-                    $"Insufficient balance. Add a payment method to cover the remaining {fromCard:0.00} {offer.Currency}.");
+                    $"Insufficient balance. Top up the wallet by {(total - ledgerBalance):0.00} {offer.Currency} to book this stay.");
 
+            var fromBalance = total;
+
+            // Npgsql retry-on-failure forbids user-managed transactions
+            // unless they're driven by an execution strategy that can
+            // replay the whole unit on transient failure.
+            var strategy = _db.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
             try
             {
-                PaymentResult? charge = null;
-                if (fromCard > 0)
-                {
-                    charge = await _payments.ChargeAsync(new PaymentChargeRequest
-                    {
-                        UserId = userId,
-                        Amount = fromCard,
-                        Currency = offer.Currency,
-                        PaymentMethodToken = request.PaymentMethodToken!,
-                        Description = $"FlyGift hotel — {offer.Name} ({offer.City})",
-                    }, ct);
-
-                    if (!charge.Success)
-                        throw new InvalidOperationException(charge.FailureReason ?? "Card declined.");
-                }
-
                 user.AccountBalance -= fromBalance;
 
                 var bref = "FGH" + Guid.NewGuid().ToString("N")[..6].ToUpper();
@@ -142,30 +132,15 @@ namespace FlyGiftBackend.Services.Hotels
                 await _db.SaveChangesAsync(ct);
 
                 var bookingRef = $"hotel:{booking.Id}";
-                if (fromBalance > 0)
+                await _balance.PostAsync(new LedgerEntry
                 {
-                    await _balance.PostAsync(new LedgerEntry
-                    {
-                        UserId = userId,
-                        Type = TransactionType.Spend,
-                        Amount = fromBalance,
-                        Currency = offer.Currency,
-                        Reference = bookingRef,
-                        Description = $"Hotel — {offer.Name} ({offer.City}) · wallet",
-                    }, ct);
-                }
-                if (fromCard > 0)
-                {
-                    await _balance.PostAsync(new LedgerEntry
-                    {
-                        UserId = userId,
-                        Type = TransactionType.Spend,
-                        Amount = fromCard,
-                        Currency = offer.Currency,
-                        Reference = bookingRef,
-                        Description = $"Hotel — {offer.Name} ({offer.City}) · card {charge?.Brand} •••{charge?.Last4}",
-                    }, ct);
-                }
+                    UserId = userId,
+                    Type = TransactionType.Spend,
+                    Amount = fromBalance,
+                    Currency = offer.Currency,
+                    Reference = bookingRef,
+                    Description = $"Hotel — {offer.Name} ({offer.City}) · wallet",
+                }, ct);
                 await tx.CommitAsync(ct);
 
                 var nights = (offer.TotalPrice == 0 || offer.NightlyRate == 0)
@@ -183,7 +158,7 @@ namespace FlyGiftBackend.Services.Hotels
                     Nights = nights,
                     TotalCharged = total,
                     PaidFromBalance = fromBalance,
-                    PaidFromCard = fromCard,
+                    PaidFromCard = 0m,
                     RemainingBalance = user.AccountBalance,
                     Currency = offer.Currency,
                 };
@@ -200,6 +175,7 @@ namespace FlyGiftBackend.Services.Hotels
                 await tx.RollbackAsync(ct);
                 throw;
             }
+            });
         }
 
         // --------------------------------------------------------------
@@ -243,7 +219,7 @@ namespace FlyGiftBackend.Services.Hotels
                     Amenities = tpl.Amenities.ToList(),
                     NightlyRate = nightly,
                     TotalPrice = total,
-                    Currency = "USD",
+                    Currency = "ILS",
                     AffordableFromBalance = afford,
                     CardTopUpRequired = afford ? 0m : Math.Max(0m, total - balance),
                 });

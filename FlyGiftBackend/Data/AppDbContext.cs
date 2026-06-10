@@ -12,6 +12,7 @@ namespace FlyGiftBackend.Data
         public DbSet<HotelBooking> HotelBookings { get; set; }
         public DbSet<FlightBooking> FlightBookings { get; set; }
         public DbSet<BulkOrder> BulkOrders { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -35,6 +36,7 @@ namespace FlyGiftBackend.Data
                 .HasOne(g => g.Recipient)
                 .WithMany()
                 .HasForeignKey(g => g.RecipientId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<GiftCard>()
@@ -42,6 +44,12 @@ namespace FlyGiftBackend.Data
 
             modelBuilder.Entity<GiftCard>()
                 .HasIndex(g => g.SenderId);
+
+            // ShortCode is the recipient's lookup key on /gifts/{code} —
+            // unique so the by-code endpoint never has to disambiguate.
+            modelBuilder.Entity<GiftCard>()
+                .HasIndex(g => g.ShortCode)
+                .IsUnique();
 
             modelBuilder.Entity<Transaction>()
                 .HasOne(t => t.User)
@@ -61,9 +69,21 @@ namespace FlyGiftBackend.Data
             modelBuilder.Entity<Transaction>()
                 .HasIndex(t => t.TransactionReference);
 
+            // One Load credit per gift card — prevents double redemption
+            // even under concurrent requests.
+            modelBuilder.Entity<Transaction>()
+                .HasIndex(t => t.RelatedGiftCardId)
+                .IsUnique()
+                .HasFilter("\"RelatedGiftCardId\" IS NOT NULL AND \"Type\" = 0 AND \"IsReversal\" = false")
+                .HasDatabaseName("IX_Transactions_GiftCardLoad_Unique");
+
             // Optimistic concurrency tokens (Stage 16). Postgres exposes the
             // built-in `xmin` system column — mapped here as a shadow property
             // that EF Core treats as a row-version concurrency token.
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.UserName)
+                .IsUnique();
+
             modelBuilder.Entity<User>()
                 .Property<uint>("xmin")
                 .HasColumnName("xmin")
@@ -99,6 +119,17 @@ namespace FlyGiftBackend.Data
                 .WithMany()
                 .HasForeignKey(h => h.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>(n =>
+            {
+                n.HasOne(x => x.User)
+                 .WithMany()
+                 .HasForeignKey(x => x.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                // Hot path: most-recent unread for the bell icon.
+                n.HasIndex(x => new { x.UserId, x.CreatedAt });
+                n.HasIndex(x => new { x.UserId, x.ReadAt });
+            });
         }
 
     }

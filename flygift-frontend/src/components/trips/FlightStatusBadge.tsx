@@ -1,5 +1,6 @@
 import type { FlightStatus } from "@/lib/tripTypes";
 import { cn } from "@/utils/cn";
+import { t } from "@/i18n/he";
 
 const STYLES: Record<FlightStatus, string> = {
     "On Time": "bg-success/15 text-success border-success/30",
@@ -13,6 +14,7 @@ const STYLES: Record<FlightStatus, string> = {
 
 export function FlightStatusBadge({ status }: { status: FlightStatus }) {
     const cls = STYLES[status] ?? STYLES.Unknown;
+    const label = t.trips.flightStatus[status] ?? status;
     return (
         <span
             className={cn(
@@ -21,7 +23,7 @@ export function FlightStatusBadge({ status }: { status: FlightStatus }) {
             )}
         >
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            {status}
+            {label}
         </span>
     );
 }

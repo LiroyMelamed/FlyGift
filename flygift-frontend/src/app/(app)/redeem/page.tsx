@@ -17,6 +17,8 @@ interface RedeemResponse {
     Response?: string;
     data?: { amount?: number; currency?: string };
     Data?: { amount?: number; currency?: string };
+    giftCard?: { amount?: number; currency?: string };
+    GiftCard?: { amount?: number; currency?: string };
 }
 
 export default function RedeemPage() {
@@ -38,22 +40,37 @@ export default function RedeemPage() {
         setLoading(true);
         try {
             const res = (await ApiUtils.post("GiftCard/Redeem", {
-                Code: code.trim(),
+                code: code.trim().toUpperCase(),
+                Code: code.trim().toUpperCase(),
             }).startRequest()) as RedeemResponse;
 
             const ok = res.success ?? res.Success;
-            if (!ok) throw new Error(res.response || res.Response || t.redeem.invalid);
+            if (!ok) {
+                const msg = res.response || res.Response || t.redeem.invalid;
+                throw new Error(msg);
+            }
 
-            const data = res.data ?? res.Data ?? {};
+            const data = (res.data ?? res.Data ?? {}) as { amount?: number; currency?: string };
+            const gift = res.giftCard ?? res.GiftCard;
             setResult({
-                amount: data.amount ?? 0,
-                currency: data.currency ?? "USD",
+                amount: data.amount ?? gift?.amount ?? 0,
+                currency: data.currency ?? gift?.currency ?? "USD",
             });
             nativeBridge.haptic("success");
         } catch (err) {
             nativeBridge.haptic("error");
+            const msg =
+                err instanceof Error && err.message
+                    ? err.message
+                    : t.redeem.invalid;
+            // Axios wraps API errors — surface the Hebrew backend message.
+            const api = err as {
+                response?: { data?: { response?: string; Response?: string } };
+            };
             setError(
-                err instanceof Error && err.message ? err.message : t.redeem.invalid
+                api?.response?.data?.response ||
+                    api?.response?.data?.Response ||
+                    msg,
             );
         } finally {
             setLoading(false);

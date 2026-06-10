@@ -1,6 +1,6 @@
 /**
- * Shape mirrors the backend Services/Flights/FlightModels.cs so we can swap
- * the mock for a real Duffel/Amadeus call by changing only the API URL.
+ * Shape mirrors the backend Services/Flights/FlightModels.cs. Provider-
+ * neutral: backend maps Kiwi Tequila / mock results into this shape.
  */
 
 export type CabinClass = "Economy" | "PremiumEconomy" | "Business" | "First";
@@ -81,10 +81,23 @@ export interface FlightSearchResponse {
     offers: FlightOffer[];
 }
 
+export interface PassengerInfo {
+    firstName: string;
+    lastName: string;
+    passportNumber?: string;
+    passportExpiry?: string; // yyyy-mm-dd
+    birthDate?: string;      // yyyy-mm-dd
+}
+
 export interface BookFlightRequest {
     offerId: string;
-    passengerName: string;
+    /** Multi-passenger manifest (preferred). One entry per pax. */
+    passengers?: PassengerInfo[];
+    /** Legacy single-name field, kept for clients that haven't migrated. */
+    passengerName?: string;
     paymentMethodToken?: string;
+    /** Set after a 409 price_changed to confirm the re-checked total. */
+    acceptedPrice?: number;
 }
 
 export interface BookFlightResult {

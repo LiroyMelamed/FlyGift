@@ -58,7 +58,7 @@ namespace FlyGiftBackend.Controllers
                 {
                     activeGiftCount = giftCards.Count(g => g.Status == GiftCardStatus.Active),
                     totalActiveBalance,
-                    currency = giftCards.FirstOrDefault()?.Currency ?? "USD",
+                    currency = giftCards.FirstOrDefault()?.Currency ?? "ILS",
                 },
             };
 

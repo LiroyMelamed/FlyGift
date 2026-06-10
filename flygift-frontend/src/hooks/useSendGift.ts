@@ -3,10 +3,12 @@
 import { useState, useCallback } from "react";
 import type { GiftCardVariant } from "@/lib/mockData";
 import { recordSpend, selectWalletBalance } from "@/lib/appStore";
+import { ApiUtils } from "@/utils/ApiUtils";
 
 export interface SendGiftPayload {
     recipientName: string;
     recipientEmail: string;
+    recipientId?: number; // optional — the wizard doesn't capture it yet
     message?: string;
     amount: number;
     currency: string;
@@ -20,33 +22,37 @@ export interface SendGiftResult {
     giftCardId?: string;
     code?: string;
     message: string;
+    /** Set when the failure was caused by insufficient wallet balance.
+     * The wizard reads this to open the top-up modal instead of showing
+     * a dead-end error. */
+    needsTopUp?: { missingAmount: number; currency: string; required: number; available: number };
 }
 
 /**
- * Generate a cryptographically-stronger gift code than Math.random.
- * Format: FG-XXXX-XXXX (uppercase base32-ish from crypto.getRandomValues).
- * Falls back to Math.random on older runtimes.
+ * Backend `GiftCardResponse` shape — extends `GeneralResponse` and adds
+ * a `giftCard` sibling. `success`/`response` come from GeneralResponse.
  */
-function generateGiftCode(): string {
-    const ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/1/I/O for legibility
-    const buf = new Uint8Array(8);
-    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-        crypto.getRandomValues(buf);
-    } else {
-        for (let i = 0; i < buf.length; i++) buf[i] = Math.floor(Math.random() * 256);
-    }
-    let s = "";
-    for (let i = 0; i < buf.length; i++) s += ALPHA[buf[i] % ALPHA.length];
-    return `FG-${s.slice(0, 4)}-${s.slice(4, 8)}`;
+interface PurchaseEnvelope {
+    success: boolean;
+    response?: string;
+    message?: string; // some endpoints emit `message`; tolerate both
+    giftCard?: {
+        id: number;
+        shortCode: string;
+        amount: number;
+        currency: string;
+        expirationDate: string;
+        createdAt: string;
+        flightSnapshot?: string | null;
+    } | null;
 }
 
 /**
  * Hook to send a gift card.
  *
- * The wallet balance is debited *only* after the (mock) API resolves
- * with success — guaranteeing we never charge a user for a failed
- * purchase. In production, swap the simulated delay for a real call
- * to `POST /api/GiftCard/Purchase` and keep the same shape.
+ * Debits the wallet *only* after `POST /api/GiftCard/Purchase` succeeds,
+ * so a failed purchase never charges the user. The gift's `ShortCode`
+ * (server-generated) is surfaced as the share code for `/gifts/{code}`.
  */
 export function useSendGift() {
     const [isLoading, setIsLoading] = useState(false);
@@ -59,28 +65,77 @@ export function useSendGift() {
         setResult(null);
 
         try {
-            // Pre-flight: don't even attempt the call if the wallet can't
-            // cover it. Fails fast in Hebrew with a clear message.
+            // Pre-flight: surface a structured "needs top-up" result when
+            // the wallet can't cover the gift, instead of erroring out.
+            // The wizard reacts by opening the payment modal.
             const wallet = selectWalletBalance();
             if (payload.amount > wallet) {
+                const missingAmount = +(payload.amount - wallet).toFixed(2);
+                const failed: SendGiftResult = {
+                    success: false,
+                    message: `יתרה לא מספקת. נדרש $${payload.amount.toFixed(2)} ויש בחשבונך $${wallet.toFixed(2)}.`,
+                    needsTopUp: {
+                        missingAmount,
+                        currency: payload.currency,
+                        required: payload.amount,
+                        available: wallet,
+                    },
+                };
+                setError(failed.message);
+                setResult(failed);
+                return failed;
+            }
+
+            // Freeze the gift's intent into FlightSnapshot so the recipient
+            // page can render variant/category/message/sender info even if
+            // live availability changes by redeem time.
+            const flightSnapshot = JSON.stringify({
+                recipientName: payload.recipientName,
+                recipientEmail: payload.recipientEmail,
+                message: payload.message ?? null,
+                variant: payload.variant,
+                category: payload.category,
+            });
+
+            const env = (await ApiUtils.post("GiftCard/Purchase", {
+                recipientId: payload.recipientId ?? 0,
+                recipientEmail: payload.recipientEmail,
+                recipientName: payload.recipientName,
+                amount: payload.amount,
+                currency: payload.currency,
+                expirationDate: payload.expirationDate,
+                flightSnapshot,
+            }).startRequest()) as PurchaseEnvelope & {
+                data?: { code?: string; required?: number; available?: number; currency?: string };
+            };
+
+            if (!env?.success || !env.giftCard) {
+                // Backend can also report insufficient balance after
+                // crossing the network — handle it the same way.
+                if (env?.data?.code === "insufficient_balance") {
+                    const required = env.data.required ?? payload.amount;
+                    const available = env.data.available ?? 0;
+                    const failed: SendGiftResult = {
+                        success: false,
+                        message: env.response || env.message || "יתרה לא מספקת.",
+                        needsTopUp: {
+                            missingAmount: +(required - available).toFixed(2),
+                            currency: env.data.currency ?? payload.currency,
+                            required,
+                            available,
+                        },
+                    };
+                    setError(failed.message);
+                    setResult(failed);
+                    return failed;
+                }
                 throw new Error(
-                    `יתרה לא מספקת. נדרש ₪${payload.amount.toFixed(
-                        2
-                    )} ויש בחשבונך ₪${wallet.toFixed(2)}.`
+                    env?.response || env?.message || "אירעה שגיאה. נסו שוב."
                 );
             }
 
-            // ── Simulated mock (offline mode) ───────────────────────────
-            await new Promise((r) => setTimeout(r, 1500));
-
-            // ── Replace with real call when backend is reachable: ───────
-            // const res = await ApiUtils.post("GiftCard/Purchase", { ... }).startRequest();
-            // if (!res.success) throw new Error(res.response);
-            // const code = res.data.code;
-            // const giftCardId = String(res.data.giftCardId);
-
-            const code = generateGiftCode();
-            const giftCardId = "gc_" + Math.random().toString(36).slice(2, 10);
+            const code = env.giftCard.shortCode;
+            const giftCardId = String(env.giftCard.id);
 
             // Only debit the wallet *after* the API confirmed success.
             recordSpend({
@@ -98,8 +153,16 @@ export function useSendGift() {
             };
             setResult(success);
             return success;
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : "אירעה שגיאה. נסו שוב.";
+        } catch (e: unknown) {
+            const err = e as {
+                response?: { data?: { response?: string; message?: string } };
+                message?: string;
+            };
+            const msg =
+                err?.response?.data?.response ||
+                err?.response?.data?.message ||
+                err?.message ||
+                "אירעה שגיאה. נסו שוב.";
             setError(msg);
             const failed: SendGiftResult = { success: false, message: msg };
             setResult(failed);

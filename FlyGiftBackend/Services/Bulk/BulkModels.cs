@@ -8,7 +8,7 @@ namespace FlyGiftBackend.Services.Bulk
         public string Email { get; set; } = "";
         public string? Phone { get; set; }
         public decimal Amount { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ILS";
 
         public List<string> Errors { get; } = new();
         public bool IsValid => Errors.Count == 0;
@@ -47,7 +47,7 @@ namespace FlyGiftBackend.Services.Bulk
     public class BulkConfirmRequest
     {
         public Guid PreviewId { get; set; }
-        public string DefaultCurrency { get; set; } = "USD";
+        public string DefaultCurrency { get; set; } = "ILS";
         public DateTime? ExpirationDate { get; set; }
         public string? Message { get; set; }
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { mockFlightApi } from "@/lib/mockFlights";
+import { flightApi } from "@/lib/flightApi";
 import type {
     FlightSearchRequest,
     FlightSearchResponse,
@@ -10,10 +10,10 @@ import type {
 /**
  * Stage 12 — Flight search hook.
  *
- * Currently backed by `mockFlightApi`. To wire the real backend
- * endpoint (`POST /api/FlightSearch`), replace the body of `search`
- * with `ApiUtils.post("FlightSearch", req).startRequest()` — the
- * response shape already matches.
+ * Calls `POST /api/FlightSearch` on the backend, which fans out to every
+ * registered provider (Kiwi Tequila in production, Mock in dev when no
+ * API key is configured). Errors come back already translated to Hebrew
+ * by the controller's Tequila → Hebrew mapping table.
  */
 export function useFlightSearch() {
     const [isLoading, setIsLoading] = useState(false);
@@ -26,7 +26,7 @@ export function useFlightSearch() {
         setError(null);
         setLastRequest(req);
         try {
-            const res = await mockFlightApi.search(req);
+            const res = await flightApi.search(req);
             setData(res);
             return res;
         } catch (e) {

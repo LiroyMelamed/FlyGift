@@ -26,7 +26,7 @@ export default function MyGiftsPage() {
 
             <GiftCardCarousel
                 cards={cards}
-                onSelect={(c) => router.push(`/gifts/${c.id}`)}
+                onSelect={(c) => router.push(`/gifts/${encodeURIComponent(c.code)}`)}
             />
         </div>
     );

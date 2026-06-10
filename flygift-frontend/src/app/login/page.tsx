@@ -8,14 +8,11 @@ import { ShieldCheck } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AuroraBackground } from "@/components/ui/AuroraBackground";
 import { PrimaryButton } from "@/components/ui/Buttons";
+import axios from "axios";
 import { ApiUtils } from "@/utils/ApiUtils";
+import { hydrateUserFromJwt } from "@/lib/appStore";
+import { decodeJwt } from "@/utils/jwt";
 import { t } from "@/i18n/he";
-
-function setAuthCookie(token: string) {
-    // Lasts 7 days. `Lax` so the middleware sees it on top-level navigations.
-    document.cookie =
-        `flygift_token=${encodeURIComponent(token)}; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-}
 
 function LoginInner() {
     const router = useRouter();
@@ -35,7 +32,7 @@ function LoginInner() {
             const res = await ApiUtils.post("Auth/Login", {
                 Username: username,
                 PasswordHash: password,
-            }).startRequest();
+            }, { timeout: 45_000 }).startRequest();
 
             // Backend returns GeneralResponse { Success, Response, Data: <jwt> }
             const token =
@@ -46,12 +43,31 @@ function LoginInner() {
             if (!ok || !token) {
                 throw new Error(res?.response || res?.Response || "Login failed");
             }
-            ApiUtils.setAuthorizationHeader(token);
-            setAuthCookie(token);
-            router.replace(next);
+            // The auth cookie is set by the backend (HttpOnly, Secure,
+            // SameSite from config) on this same response. We can't read
+            // it from JS — that's the point. We DO get the token in the
+            // body though, which lets us decode role for routing without
+            // an extra API roundtrip. The token itself is not stored.
+            ApiUtils.setAuthorizationHeader(token); // for any in-flight calls in this tab
+            const claims = decodeJwt(token);
+            // Persist role/displayName into the appStore from the JWT we
+            // just received — avoids needing a /Me endpoint.
+            hydrateUserFromJwt();
+
+            const dest =
+                next !== "/dashboard"
+                    ? next
+                    : claims?.role === "Company"
+                        ? "/company/dashboard"
+                        : "/dashboard";
+            router.replace(dest);
         } catch (err) {
-            const msg =
-                err instanceof Error && err.message
+            const isTimeout =
+                axios.isAxiosError(err)
+                && (err.code === "ECONNABORTED" || err.message.includes("timeout"));
+            const msg = isTimeout
+                ? t.auth.loginSlow
+                : err instanceof Error && err.message
                     ? err.message
                     : t.auth.invalidCredentials;
             setError(msg);

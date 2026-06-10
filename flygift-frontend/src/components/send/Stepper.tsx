@@ -12,12 +12,21 @@ export interface StepperProps {
 
 export function Stepper({ steps, current, className }: StepperProps) {
     return (
-        <ol className={cn("flex items-start gap-2", className)} aria-label="Progress">
+        <ol className={cn("flex items-start", className)} aria-label="Progress">
             {steps.map((label, i) => {
                 const isDone = i < current;
                 const isActive = i === current;
+                const isLast = i === steps.length - 1;
                 return (
-                    <li key={label} className="flex flex-1 items-center gap-2">
+                    <li
+                        key={label}
+                        className={cn(
+                            "flex items-center",
+                            // Only intermediate steps stretch — the last one
+                            // hugs its label so the row stays centered.
+                            isLast ? "flex-none" : "flex-1 gap-2"
+                        )}
+                    >
                         <div className="flex flex-col items-center gap-1.5">
                             <motion.span
                                 initial={false}
@@ -45,7 +54,7 @@ export function Stepper({ steps, current, className }: StepperProps) {
                                 {label}
                             </span>
                         </div>
-                        {i < steps.length - 1 ? (
+                        {!isLast && (
                             <div className="relative -mt-4 h-0.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
                                 <motion.div
                                     initial={false}
@@ -54,8 +63,6 @@ export function Stepper({ steps, current, className }: StepperProps) {
                                     className="absolute inset-y-0 left-0 bg-cyan-jet shadow-glow-cyan"
                                 />
                             </div>
-                        ) : (
-                            <div aria-hidden className="-mt-4 h-0.5 flex-1" />
                         )}
                     </li>
                 );

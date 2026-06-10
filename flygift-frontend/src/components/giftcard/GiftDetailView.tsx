@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Sparkles } from "lucide-react";
-import { GiftCard3D } from "@/components/giftcard/GiftCard3D";
+import { LuxuryGiftCard } from "@/components/giftcard/LuxuryGiftCard";
 import { RevealCode } from "@/components/giftcard/RevealCode";
 import { RedeemModal } from "@/components/giftcard/RedeemModal";
 import { ShareToStoryButton } from "@/components/giftcard/ShareToStoryButton";
@@ -36,6 +36,12 @@ export function GiftDetailView({ initialCard }: Props) {
     const card: MockGiftCard = liveCard ?? initialCard;
     const [showRedeem, setShowRedeem] = useState(false);
 
+    // Sender name may arrive blank if the backend has neither
+    // FirstName/LastName nor a UserName for the issuing user. Show
+    // a friendly default so the card never renders "מאת " with a
+    // dangling space.
+    const displaySenderName = (card.senderName ?? "").trim() || "FlyGift";
+
     const isFlight = card.category === "Flights";
     const canRedeem = card.status === "Active";
 
@@ -45,10 +51,8 @@ export function GiftDetailView({ initialCard }: Props) {
         return "ממשו עכשיו";
     }, [card.status]);
 
-    const handleRedeemed = (redeemedAt: string) => {
-        // The store has already been mutated by useRedeemGift; nothing
-        // else to do here — every consumer of the store re-renders.
-        void redeemedAt;
+    const handleRedeemed = () => {
+        setShowRedeem(false);
     };
 
     return (
@@ -73,7 +77,7 @@ export function GiftDetailView({ initialCard }: Props) {
                     <StatusPill status={card.status} />
                 </motion.div>
 
-                {/* Hero card */}
+                {/* Hero card — Stage 26 brand surface */}
                 <motion.div
                     custom={1}
                     initial="hidden"
@@ -81,7 +85,13 @@ export function GiftDetailView({ initialCard }: Props) {
                     variants={fadeUp}
                     className="flex justify-center"
                 >
-                    <GiftCard3D card={card} className="w-full" />
+                    <LuxuryGiftCard
+                        amount={card.amount}
+                        currency={card.currency}
+                        code={card.code}
+                        fromCity={card.originIata}
+                        toCity={card.destinationIata}
+                    />
                 </motion.div>
 
                 {/* Stage 18 — Share the Joy (Instagram Story) */}
@@ -91,7 +101,7 @@ export function GiftDetailView({ initialCard }: Props) {
                     animate="show"
                     variants={fadeUp}
                 >
-                    <ShareToStoryButton card={card} companyName={card.senderName} />
+                    <ShareToStoryButton card={card} companyName={displaySenderName} />
                 </motion.div>
 
                 {/* Reveal code */}
@@ -116,7 +126,7 @@ export function GiftDetailView({ initialCard }: Props) {
                                 ”{card.message}“
                             </p>
                             <p className="mt-3 text-xs text-text-secondary text-right">
-                                — {card.senderName}
+                                — {displaySenderName}
                             </p>
                         </GlassCard>
                     </motion.div>
@@ -129,7 +139,7 @@ export function GiftDetailView({ initialCard }: Props) {
                             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-secondary">
                                 <User className="h-3 w-3" /> מאת
                             </div>
-                            <p className="font-medium">{card.senderName}</p>
+                            <p className="font-medium">{displaySenderName}</p>
                         </div>
                         <div className="space-y-1">
                             <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-secondary">

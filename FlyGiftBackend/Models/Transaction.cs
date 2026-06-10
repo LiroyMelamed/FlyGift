@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace FlyGiftBackend.Models
 {
@@ -58,6 +59,7 @@ namespace FlyGiftBackend.Models
         public DateTime CreatedAt { get; set; }
     }
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum TransactionType
     {
         Load,

@@ -107,7 +107,7 @@ namespace FlyGiftBackend.Controllers
                     redemptionRate,
                     avgGiftAmount,
                     avgTimeToRedemptionDays,
-                    currency = cards.FirstOrDefault()?.Currency ?? "USD",
+                    currency = cards.FirstOrDefault()?.Currency ?? "ILS",
                 },
                 spendingTrend = trend,
                 topDestinations,

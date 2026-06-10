@@ -1,18 +1,18 @@
 /** Format helpers for money & dates. */
 
-// Stage 23 — Israeli Shekel (₪) is the canonical FlyGift currency.
-// All callers default to ILS unless they explicitly pass another code.
-// USD inputs are normalised so legacy mock data still renders in ₪.
+// Stage 24 — Brand pivot to USD. Display the currency the record carries;
+// Kiwi is configured with curr=USD so search/check/book prices align.
 function normaliseCurrency(c?: string): string {
-    if (!c) return "ILS";
-    const up = c.toUpperCase();
-    return up === "USD" ? "ILS" : up;
+    const code = (c ?? "USD").trim().toUpperCase();
+    if (code === "ILS" || code === "NIS") return "ILS";
+    if (code === "EUR") return "EUR";
+    return "USD";
 }
 
 export function formatCurrency(
     amount: number,
-    currency: string = "ILS",
-    locale: string = "he-IL"
+    currency: string = "USD",
+    locale: string = "en-US"
 ): string {
     return new Intl.NumberFormat(locale, {
         style: "currency",
@@ -23,8 +23,8 @@ export function formatCurrency(
 
 export function formatCurrencyDetailed(
     amount: number,
-    currency: string = "ILS",
-    locale: string = "he-IL"
+    currency: string = "USD",
+    locale: string = "en-US"
 ): string {
     return new Intl.NumberFormat(locale, {
         style: "currency",
