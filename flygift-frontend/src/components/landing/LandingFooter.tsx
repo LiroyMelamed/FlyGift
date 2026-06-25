@@ -19,9 +19,20 @@ export function LandingFooter() {
                         · {t.landing.footer.tagline}
                     </span>
                 </div>
-                <p className="text-[11px] text-text-secondary">
-                    © {new Date().getFullYear()} FlyGift · {t.landing.footer.rights}
-                </p>
+                <div className="flex items-center gap-3">
+                    <a
+                        href="https://mela-media.co.il"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-text-secondary transition-colors hover:text-white"
+                    >
+                        נבנה ע״י MelaMedia
+                    </a>
+                    <span className="text-[11px] text-text-secondary opacity-40">·</span>
+                    <p className="text-[11px] text-text-secondary">
+                        © {new Date().getFullYear()} FlyGift · {t.landing.footer.rights}
+                    </p>
+                </div>
             </div>
         </footer>
     );
